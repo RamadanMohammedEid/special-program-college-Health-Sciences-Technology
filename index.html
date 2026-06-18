@@ -1,0 +1,1935 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>التقدم للالتحاق بالبرنامج - كلية تكنولوجيا العلوم الصحية التطبيقية</title>
+
+<!-- ========================================================
+     ⚙️ CONFIG - غيّر هذا الرابط برابط Web App الخاص بك
+     ======================================================== -->
+<script>
+  const API_URL = 'https://script.google.com/macros/s/AKfycbzW1kh-KBGg0VpnnrsuPXyFkvozKw0Aep3QSCHHMnTjXluRBXUDhz0RsWppKbq4Ibq6/exec';
+  const IMGBB_KEY = '0b752241c19734aee95ca664ea594c4e';
+</script>
+
+<style>
+  /* ── Tokens ───────────────────────────────────────────── */
+  :root {
+    --primary:       #1a6e8e;
+    --primary-light: #2492b8;
+    --primary-xlt:   #e8f4f8;
+    --accent:        #0ea89e;
+    --accent-light:  #d4f0ee;
+    --gold:          #c8972b;
+    --surface:       #ffffff;
+    --surface-2:     #f5f8fa;
+    --surface-3:     #eef3f6;
+    --border:        #d4e3ea;
+    --text-1:        #1a2b35;
+    --text-2:        #4a6072;
+    --text-3:        #7a93a3;
+    --danger:        #c0392b;
+    --danger-bg:     #fdf0ee;
+    --success:       #1a7a4e;
+    --success-bg:    #edf7f2;
+    --warning:       #b8720a;
+    --warning-bg:    #fef8ec;
+    --radius-sm:     6px;
+    --radius:        12px;
+    --radius-lg:     18px;
+    --shadow-sm:     0 1px 4px rgba(26,110,142,.08);
+    --shadow:        0 4px 20px rgba(26,110,142,.10);
+    --shadow-lg:     0 12px 48px rgba(26,110,142,.14);
+    --font-main:     'Cairo', sans-serif;
+  }
+
+  /* ── Reset ───────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap');
+
+  body {
+    font-family: var(--font-main);
+    background: linear-gradient(145deg, #e8f4f8 0%, #f0f8fc 50%, #e0f0f5 100%);
+    min-height: 100vh;
+    color: var(--text-1);
+  }
+
+  /* ── Header ──────────────────────────────────────────── */
+  .site-header {
+    background: var(--surface);
+    border-bottom: 2px solid var(--primary-xlt);
+    box-shadow: var(--shadow-sm);
+    position: sticky; top: 0; z-index: 100;
+  }
+
+  .header-inner {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .logo-wrap {
+    width: 60px; height: 60px;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px; flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(26,110,142,.3);
+  }
+
+  .header-text h1 {
+    font-size: 17px; font-weight: 800;
+    color: var(--primary);
+    line-height: 1.3;
+  }
+
+  .header-text p {
+    font-size: 12px; color: var(--text-3);
+    font-weight: 500;
+    margin-top: 2px;
+  }
+
+  .badge-univ {
+    margin-right: auto;
+    background: var(--primary-xlt);
+    color: var(--primary);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 5px 14px;
+    font-size: 12px; font-weight: 700;
+    white-space: nowrap;
+  }
+
+  /* ── Progress bar ─────────────────────────────────────── */
+  .progress-wrap {
+    max-width: 900px;
+    margin: 28px auto 0;
+    padding: 0 24px;
+  }
+
+  .steps-track {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    position: relative;
+  }
+
+  .step-item {
+    display: flex; flex-direction: column; align-items: center;
+    flex: 1; position: relative; z-index: 1;
+  }
+
+  .step-circle {
+    width: 38px; height: 38px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 800;
+    border: 2px solid var(--border);
+    background: var(--surface);
+    color: var(--text-3);
+    transition: all .35s ease;
+  }
+
+  .step-item.active .step-circle {
+    background: var(--primary); border-color: var(--primary);
+    color: #fff; box-shadow: 0 0 0 4px rgba(26,110,142,.15);
+  }
+
+  .step-item.done .step-circle {
+    background: var(--accent); border-color: var(--accent); color: #fff;
+  }
+
+  .step-label {
+    font-size: 11px; color: var(--text-3); margin-top: 6px;
+    font-weight: 600; text-align: center;
+    transition: color .35s;
+  }
+
+  .step-item.active .step-label { color: var(--primary); }
+  .step-item.done .step-label   { color: var(--accent); }
+
+  .step-line {
+    flex: 1; height: 2px; background: var(--border);
+    transition: background .35s;
+    position: relative; top: -10px;
+  }
+
+  .step-line.done { background: var(--accent); }
+
+  /* ── Main layout ──────────────────────────────────────── */
+  .form-container {
+    max-width: 900px;
+    margin: 28px auto 60px;
+    padding: 0 24px;
+  }
+
+  /* ── Card ─────────────────────────────────────────────── */
+  .card {
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .card-header {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    padding: 22px 28px;
+    display: flex; align-items: center; gap: 14px;
+  }
+
+  .card-header-icon {
+    width: 42px; height: 42px; border-radius: 10px;
+    background: rgba(255,255,255,.18);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+  }
+
+  .card-header h2 {
+    font-size: 18px; font-weight: 800; color: #fff;
+  }
+
+  .card-header p { font-size: 13px; color: rgba(255,255,255,.75); margin-top: 2px; }
+
+  .card-body { padding: 32px 28px; }
+
+  /* ── Section ──────────────────────────────────────────── */
+  .section { display: none; animation: fadeIn .4s ease; }
+  .section.active { display: block; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Grid ─────────────────────────────────────────────── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+  .col-span-2 { grid-column: span 2; }
+  .col-span-3 { grid-column: span 3; }
+
+  /* ── Form controls ────────────────────────────────────── */
+  .field { display: flex; flex-direction: column; gap: 7px; }
+
+  label {
+    font-size: 13px; font-weight: 700; color: var(--text-2);
+    display: flex; align-items: center; gap: 5px;
+  }
+
+  label .req { color: var(--danger); }
+  label .hint { font-size: 11px; color: var(--text-3); font-weight: 400; }
+
+  input, select, textarea {
+    width: 100%;
+    padding: 11px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-main);
+    font-size: 14px; font-weight: 500;
+    color: var(--text-1);
+    background: var(--surface-2);
+    transition: border-color .2s, box-shadow .2s, background .2s;
+    outline: none;
+  }
+
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--primary);
+    background: var(--surface);
+    box-shadow: 0 0 0 3px rgba(26,110,142,.1);
+  }
+
+  input.error, select.error { border-color: var(--danger); }
+
+  .field-error {
+    font-size: 11px; color: var(--danger); font-weight: 600;
+    display: flex; align-items: center; gap: 4px;
+    opacity: 0; height: 0; overflow: hidden;
+    transition: opacity .2s, height .2s;
+  }
+
+  .field-error.visible { opacity: 1; height: auto; }
+
+  /* ── Radio group ──────────────────────────────────────── */
+  .radio-group { display: flex; gap: 10px; flex-wrap: wrap; }
+
+  .radio-opt {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 18px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all .2s;
+    font-size: 14px; font-weight: 600;
+    color: var(--text-2);
+    background: var(--surface-2);
+    user-select: none;
+  }
+
+  .radio-opt:hover { border-color: var(--primary); }
+  .radio-opt input { display: none; }
+  .radio-opt.selected {
+    border-color: var(--primary);
+    background: var(--primary-xlt);
+    color: var(--primary);
+  }
+
+  /* ── File upload ──────────────────────────────────────── */
+  .upload-area {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 24px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .25s;
+    position: relative;
+    background: var(--surface-2);
+  }
+
+  .upload-area:hover { border-color: var(--primary); background: var(--primary-xlt); }
+
+  .upload-area input[type="file"] {
+    position: absolute; inset: 0; opacity: 0;
+    width: 100%; height: 100%; cursor: pointer;
+  }
+
+  .upload-icon { font-size: 30px; margin-bottom: 8px; }
+  .upload-title { font-size: 13px; font-weight: 700; color: var(--text-2); }
+  .upload-sub { font-size: 11px; color: var(--text-3); margin-top: 3px; }
+
+  .upload-preview {
+    margin-top: 10px;
+    display: flex; align-items: center; gap: 10px;
+    background: var(--success-bg);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    padding: 8px 12px;
+    display: none;
+  }
+
+  .upload-preview img {
+    width: 48px; height: 48px;
+    object-fit: cover; border-radius: 6px;
+    border: 1px solid var(--border);
+  }
+
+  .upload-preview-name {
+    font-size: 12px; font-weight: 700; color: var(--success); flex: 1;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  .upload-spinner { display: none; }
+  .upload-area.uploading { pointer-events: none; }
+  .upload-area.uploading .upload-spinner { display: block; }
+  .upload-area.uploading .upload-icon,
+  .upload-area.uploading .upload-title { display: none; }
+
+  .upload-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  /* ── Divider ──────────────────────────────────────────── */
+  .divider {
+    display: flex; align-items: center; gap: 12px;
+    margin: 28px 0;
+  }
+
+  .divider::before, .divider::after {
+    content: ''; flex: 1; height: 1px; background: var(--border);
+  }
+
+  .divider-label {
+    font-size: 12px; font-weight: 700; color: var(--text-3);
+    text-transform: uppercase; letter-spacing: .5px;
+    white-space: nowrap;
+  }
+
+  /* ── Info banner ──────────────────────────────────────── */
+  .info-banner {
+    background: var(--warning-bg);
+    border: 1px solid rgba(200,151,43,.3);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    display: flex; gap: 12px;
+    margin-bottom: 28px;
+  }
+
+  .info-banner-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+  .info-banner-text { font-size: 13px; color: var(--warning); line-height: 1.7; font-weight: 600; }
+  .info-banner-text strong { font-weight: 800; }
+
+  /* ── Rejection alert ──────────────────────────────────── */
+  .rejection-alert {
+    background: var(--danger-bg);
+    border: 2px solid var(--danger);
+    border-radius: var(--radius);
+    padding: 24px;
+    display: none;
+  }
+
+  .rejection-alert h3 {
+    color: var(--danger); font-size: 18px; font-weight: 800;
+    margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+  }
+
+  .rejection-reason {
+    background: rgba(192,57,43,.07);
+    border-radius: 8px; padding: 12px 16px;
+    font-size: 14px; color: var(--danger);
+    line-height: 1.9; font-weight: 600;
+    margin-bottom: 10px;
+  }
+
+  /* ── Success screen ───────────────────────────────────── */
+  .success-screen {
+    text-align: center; padding: 60px 20px;
+  }
+
+  .success-circle {
+    width: 90px; height: 90px; border-radius: 50%;
+    background: var(--success-bg);
+    border: 3px solid var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 40px; margin: 0 auto 24px;
+    animation: pop .5s cubic-bezier(.18,.89,.32,1.28);
+  }
+
+  @keyframes pop {
+    from { transform: scale(0); opacity: 0; }
+    to   { transform: scale(1); opacity: 1; }
+  }
+
+  .success-screen h2 {
+    font-size: 24px; font-weight: 800; color: var(--success);
+    margin-bottom: 10px;
+  }
+
+  .success-screen p { color: var(--text-2); font-size: 15px; line-height: 1.8; }
+
+  .app-id-box {
+    display: inline-block;
+    background: var(--primary-xlt);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 32px;
+    margin: 24px 0;
+  }
+
+  .app-id-label { font-size: 12px; color: var(--text-3); font-weight: 600; }
+  .app-id-value { font-size: 22px; font-weight: 800; color: var(--primary); margin-top: 4px; letter-spacing: 1px; }
+
+  /* ── Buttons ──────────────────────────────────────────── */
+  .btn-row {
+    display: flex; gap: 12px; justify-content: flex-end;
+    margin-top: 32px; padding-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 12px 28px;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-main); font-size: 14px; font-weight: 700;
+    cursor: pointer; border: none;
+    transition: all .2s;
+  }
+
+  .btn-outline {
+    background: transparent;
+    border: 1.5px solid var(--border);
+    color: var(--text-2);
+  }
+  .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(26,110,142,.3);
+  }
+  .btn-primary:hover { box-shadow: 0 6px 20px rgba(26,110,142,.4); transform: translateY(-1px); }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-primary:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+
+  .btn-accent {
+    background: linear-gradient(135deg, var(--accent) 0%, #0d9590 100%);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(14,168,158,.3);
+  }
+  .btn-accent:hover { box-shadow: 0 6px 20px rgba(14,168,158,.4); transform: translateY(-1px); }
+
+  /* ── Spinner ──────────────────────────────────────────── */
+  .spinner {
+    width: 18px; height: 18px;
+    border: 2px solid rgba(255,255,255,.4);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    display: inline-block;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Gender show/hide military ────────────────────────── */
+  #military-section { transition: all .3s; }
+
+  /* ── Upload docs grid ─────────────────────────────────── */
+  .docs-section-title {
+    font-size: 14px; font-weight: 800; color: var(--primary);
+    margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px;
+    background: var(--primary-xlt);
+    border-radius: 8px;
+    border-right: 4px solid var(--primary);
+  }
+
+  /* ── Percentage live bar ──────────────────────────────── */
+  .pct-bar-wrap { height: 5px; background: var(--border); border-radius: 3px; margin-top: 5px; }
+  .pct-bar { height: 100%; border-radius: 3px; width: 0; transition: width .4s, background .4s; }
+
+  /* ── Status Inquiry ────────────────────────────────────── */
+  .inquiry-section {
+    max-width: 900px;
+    margin: 24px auto 0;
+    padding: 0 24px;
+  }
+
+  .inquiry-toggle-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 13px 20px;
+    width: 100%;
+    cursor: pointer;
+    font-family: var(--font-main);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--primary);
+    transition: all .25s;
+    box-shadow: var(--shadow-sm);
+  }
+  .inquiry-toggle-btn:hover {
+    border-color: var(--primary);
+    background: var(--primary-xlt);
+    box-shadow: var(--shadow);
+  }
+  .inquiry-toggle-btn .iq-icon {
+    width: 36px; height: 36px; border-radius: 9px;
+    background: var(--primary-xlt);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+    transition: background .25s;
+  }
+  .inquiry-toggle-btn:hover .iq-icon { background: rgba(26,110,142,.15); }
+  .inquiry-toggle-btn .iq-arrow {
+    margin-right: auto;
+    font-size: 12px;
+    transition: transform .3s;
+    color: var(--text-3);
+  }
+  .inquiry-toggle-btn.open .iq-arrow { transform: rotate(180deg); }
+
+  .inquiry-panel {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 var(--radius) var(--radius);
+    padding: 24px;
+    display: none;
+    animation: slideDown .3s ease;
+    box-shadow: var(--shadow);
+  }
+  .inquiry-panel.open { display: block; }
+
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .inquiry-input-row {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+  }
+
+  .inquiry-input-row .field { flex: 1; }
+
+  .inquiry-result {
+    margin-top: 20px;
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 1.5px solid var(--border);
+    display: none;
+  }
+  .inquiry-result.visible { display: block; animation: fadeIn .4s ease; }
+
+  .iq-result-header {
+    padding: 16px 20px;
+    display: flex; align-items: center; gap: 12px;
+    font-weight: 800; font-size: 15px;
+  }
+  .iq-result-body {
+    padding: 18px 20px;
+    background: var(--surface-2);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .iq-field { display: flex; flex-direction: column; gap: 3px; }
+  .iq-field-label { font-size: 11px; font-weight: 700; color: var(--text-3); }
+  .iq-field-value { font-size: 14px; font-weight: 600; color: var(--text-1); }
+
+  .status-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 14px;
+    border-radius: 20px;
+    font-size: 13px; font-weight: 700;
+  }
+  .status-pending  { background: #fff3cd; color: #856404; }
+  .status-accepted { background: #d4edda; color: #155724; }
+  .status-rejected { background: #f8d7da; color: #721c24; }
+  .status-waiting  { background: #cce5ff; color: #004085; }
+
+  .iq-rejection-note {
+    margin-top: 14px;
+    background: #fdf0ee;
+    border: 1.5px solid #e8a59b;
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 13px; color: var(--danger); font-weight: 600;
+    line-height: 1.8;
+  }
+  .iq-admin-note {
+    margin-top: 10px;
+    background: var(--primary-xlt);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 13px; color: var(--primary); font-weight: 600;
+    line-height: 1.8;
+  }
+
+  .iq-not-found {
+    margin-top: 20px;
+    background: var(--surface-2);
+    border: 1.5px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    text-align: center;
+    display: none;
+  }
+  .iq-not-found.visible { display: block; animation: fadeIn .3s ease; }
+  .iq-not-found p { font-size: 14px; color: var(--text-2); font-weight: 600; margin-top: 8px; }
+
+  /* ── Beautiful Dialog Box ──────────────────────────────── */
+  .dialog-overlay {
+    position: fixed; inset: 0;
+    background: rgba(10,25,35,.55);
+    backdrop-filter: blur(4px);
+    z-index: 9999;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+    opacity: 0; pointer-events: none;
+    transition: opacity .25s;
+  }
+  .dialog-overlay.open {
+    opacity: 1; pointer-events: all;
+  }
+
+  .dialog-box {
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 24px 80px rgba(10,25,35,.25);
+    width: 100%; max-width: 480px;
+    overflow: hidden;
+    transform: scale(.92) translateY(16px);
+    transition: transform .3s cubic-bezier(.18,.89,.32,1.15);
+  }
+  .dialog-overlay.open .dialog-box {
+    transform: scale(1) translateY(0);
+  }
+
+  .dialog-header {
+    padding: 22px 24px 18px;
+    display: flex; align-items: flex-start; gap: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .dialog-icon-wrap {
+    width: 48px; height: 48px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; flex-shrink: 0;
+  }
+  .dialog-icon-wrap.error   { background: #fdf0ee; }
+  .dialog-icon-wrap.success { background: var(--success-bg); }
+  .dialog-icon-wrap.warning { background: var(--warning-bg); }
+  .dialog-icon-wrap.info    { background: var(--primary-xlt); }
+
+  .dialog-title {
+    font-size: 16px; font-weight: 800;
+    color: var(--text-1);
+    line-height: 1.3;
+    margin-bottom: 4px;
+  }
+  .dialog-subtitle {
+    font-size: 12px; color: var(--text-3); font-weight: 500;
+  }
+  .dialog-close {
+    margin-right: auto;
+    background: var(--surface-3);
+    border: none; border-radius: 8px;
+    width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 14px; color: var(--text-2);
+    transition: background .2s;
+    flex-shrink: 0;
+  }
+  .dialog-close:hover { background: var(--border); }
+
+  .dialog-body {
+    padding: 18px 24px 24px;
+  }
+  .dialog-message {
+    font-size: 14px; color: var(--text-2); line-height: 1.75; font-weight: 500;
+  }
+
+  .dialog-items {
+    display: flex; flex-direction: column; gap: 10px;
+    margin-top: 14px;
+  }
+  .dialog-item {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 13px; color: var(--text-1); font-weight: 600;
+    line-height: 1.7;
+    border-right: 4px solid var(--danger);
+  }
+  .dialog-item.warning-item { border-right-color: var(--warning); }
+  .dialog-item.info-item    { border-right-color: var(--primary); }
+
+  .dialog-footer {
+    padding: 0 24px 22px;
+    display: flex; gap: 10px; justify-content: flex-end;
+  }
+  .dialog-btn {
+    padding: 10px 24px;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-main); font-size: 14px; font-weight: 700;
+    cursor: pointer; border: none;
+    transition: all .2s;
+  }
+  .dialog-btn-primary {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(26,110,142,.3);
+  }
+  .dialog-btn-primary:hover { box-shadow: 0 6px 18px rgba(26,110,142,.4); transform: translateY(-1px); }
+  .dialog-btn-secondary {
+    background: var(--surface-3);
+    color: var(--text-2);
+    border: 1.5px solid var(--border);
+  }
+  .dialog-btn-secondary:hover { background: var(--border); }
+
+  /* ── Responsive ───────────────────────────────────────── */
+  @media (max-width: 680px) {
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    .col-span-2, .col-span-3 { grid-column: span 1; }
+    .card-body { padding: 20px 16px; }
+    .upload-grid { grid-template-columns: 1fr; }
+    .header-inner { gap: 10px; }
+    .badge-univ { display: none; }
+    .header-text h1 { font-size: 14px; }
+    .progress-wrap { margin-top: 16px; }
+    .step-label { font-size: 10px; }
+    .step-circle { width: 32px; height: 32px; font-size: 12px; }
+    .inquiry-input-row { flex-direction: column; }
+    .inquiry-input-row .btn { width: 100%; justify-content: center; }
+    .iq-result-body { grid-template-columns: 1fr; }
+    .form-container { margin: 16px auto 40px; }
+    .btn-row { flex-wrap: wrap; }
+    .btn-row .btn { flex: 1; justify-content: center; min-width: 120px; }
+    .dialog-box { max-width: 100%; }
+    .dialog-header { padding: 18px 18px 14px; }
+    .dialog-body { padding: 14px 18px 20px; }
+    .dialog-footer { padding: 0 18px 18px; }
+    .inquiry-section { margin-top: 16px; }
+    .card-header { padding: 18px 20px; }
+    .card-header h2 { font-size: 16px; }
+  }
+
+  @media (max-width: 400px) {
+    .header-inner { padding: 10px 14px; }
+    .logo-wrap { width: 46px; height: 46px; font-size: 22px; }
+    .steps-track { gap: 0; }
+    .step-line { min-width: 10px; }
+    .progress-wrap { padding: 0 14px; }
+    .form-container { padding: 0 14px; }
+    .inquiry-section { padding: 0 14px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────── -->
+<header class="site-header">
+  <div class="header-inner">
+    <div class="logo-wrap">🏥</div>
+    <div class="header-text">
+      <h1>كلية تكنولوجيا العلوم الصحية التطبيقية</h1>
+      <p>جامعة بني سويف — التقدم للالتحاق بالبرنامج</p>
+    </div>
+    <span class="badge-univ">بني سويف</span>
+  </div>
+</header>
+
+<!-- ── Beautiful Dialog Box ─────────────────────────────── -->
+<div class="dialog-overlay" id="dialog-overlay" onclick="closeDialogOnOverlay(event)">
+  <div class="dialog-box" id="dialog-box">
+    <div class="dialog-header">
+      <div class="dialog-icon-wrap error" id="dialog-icon-wrap">
+        <span id="dialog-icon">❌</span>
+      </div>
+      <div style="flex:1;">
+        <div class="dialog-title" id="dialog-title">عنوان التنبيه</div>
+        <div class="dialog-subtitle" id="dialog-subtitle">كلية تكنولوجيا العلوم الصحية التطبيقية</div>
+      </div>
+      <button class="dialog-close" onclick="closeDialog()">✕</button>
+    </div>
+    <div class="dialog-body">
+      <div class="dialog-message" id="dialog-message"></div>
+      <div class="dialog-items" id="dialog-items"></div>
+    </div>
+    <div class="dialog-footer" id="dialog-footer">
+      <button class="dialog-btn dialog-btn-primary" onclick="closeDialog()">حسناً، فهمت</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Status Inquiry ────────────────────────────────────── -->
+<div class="inquiry-section">
+  <button class="inquiry-toggle-btn" id="inquiry-toggle-btn" onclick="toggleInquiry()">
+    <div class="iq-icon">🔍</div>
+    <div>
+      <div>الاستعلام عن حالة الطلب</div>
+      <div style="font-size:11px; font-weight:500; color:var(--text-3); margin-top:1px;">تحقق من حالة طلبك برقمك القومي</div>
+    </div>
+    <span class="iq-arrow">▼</span>
+  </button>
+  <div class="inquiry-panel" id="inquiry-panel">
+    <div class="inquiry-input-row">
+      <div class="field">
+        <label>الرقم القومي <span class="req">*</span> <span class="hint">(14 رقم)</span></label>
+        <input type="text" id="iq-national-id" maxlength="14" placeholder="أدخل الرقم القومي المكوّن من 14 رقماً" dir="ltr"
+          style="letter-spacing:2px;" onkeydown="if(event.key==='Enter') checkStatus()">
+      </div>
+      <button class="btn btn-primary" onclick="checkStatus()" id="iq-btn" style="padding:11px 24px; white-space:nowrap;">
+        <span id="iq-btn-text">🔍 استعلام</span>
+        <span id="iq-btn-spinner" style="display:none;"><span class="spinner"></span></span>
+      </button>
+    </div>
+
+    <!-- Result -->
+    <div class="inquiry-result" id="iq-result">
+      <div class="iq-result-header" id="iq-result-header"></div>
+      <div class="iq-result-body" id="iq-result-body"></div>
+      <div id="iq-notes-wrap" style="padding:0 20px 18px;"></div>
+    </div>
+
+    <!-- Not found -->
+    <div class="iq-not-found" id="iq-not-found">
+      <div style="font-size:36px;">🔎</div>
+      <p>لم يتم العثور على طلب مرتبط بهذا الرقم القومي.<br>
+        <span style="font-size:12px; color:var(--text-3); font-weight:500;">تأكد من صحة الرقم القومي أو تواصل مع إدارة الكلية.</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- ── Progress ────────────────────────────────────────── -->
+<div class="progress-wrap">
+  <div class="steps-track">
+    <div class="step-item active" id="step-dot-1">
+      <div class="step-circle">١</div>
+      <span class="step-label">البيانات الشخصية</span>
+    </div>
+    <div class="step-line" id="line-1-2"></div>
+    <div class="step-item" id="step-dot-2">
+      <div class="step-circle">٢</div>
+      <span class="step-label">البيانات الأكاديمية</span>
+    </div>
+    <div class="step-line" id="line-2-3"></div>
+    <div class="step-item" id="step-dot-3">
+      <div class="step-circle">٣</div>
+      <span class="step-label">بيانات التواصل</span>
+    </div>
+    <div class="step-line" id="line-3-4"></div>
+    <div class="step-item" id="step-dot-4">
+      <div class="step-circle">٤</div>
+      <span class="step-label">المستندات</span>
+    </div>
+    <div class="step-line" id="line-4-5"></div>
+    <div class="step-item" id="step-dot-5">
+      <div class="step-circle">٥</div>
+      <span class="step-label">المراجعة والإرسال</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── Form ─────────────────────────────────────────────── -->
+<div class="form-container">
+  <div class="card">
+
+    <!-- Rejection alert (shown inline before submit) -->
+    <div class="card-body" id="rejection-wrap" style="display:none; padding-bottom:0;">
+      <div class="rejection-alert" id="rejection-alert">
+        <h3>❌ عذرًا، لا يمكن استكمال التقديم</h3>
+        <div id="rejection-reasons"></div>
+        <p style="font-size:13px; color:var(--text-2); margin-top:12px;">
+          إذا كنت تعتقد أن هناك خطأ في البيانات، يرجى التواصل مع إدارة الكلية.
+        </p>
+      </div>
+    </div>
+
+    <!-- ── SECTION 1: Personal ──────────────────────────── -->
+    <div class="section active" id="section-1">
+      <div class="card-header">
+        <div class="card-header-icon">👤</div>
+        <div>
+          <h2>البيانات الشخصية</h2>
+          <p>الخطوة الأولى من خمس خطوات</p>
+        </div>
+      </div>
+      <div class="card-body">
+
+        <div class="info-banner">
+          <span class="info-banner-icon">ℹ️</span>
+          <div class="info-banner-text">
+            يُرجى التأكد من صحة جميع البيانات المُدخلة. <strong>الشروط:</strong>
+            ألا يتجاوز السن 30 عامًا، وألا يكون قد مضى على التخرج أكثر من 10 سنوات، وأن يكون التقدير «جيد جداً» على الأقل.
+          </div>
+        </div>
+
+        <div style="display:grid; gap:20px;">
+          <div class="field">
+            <label>الاسم الرباعي باللغة العربية <span class="req">*</span>
+              <span class="hint">(الاسم كاملاً كما هو في البطاقة)</span>
+            </label>
+            <input type="text" id="fullName" placeholder="مثال: محمد أحمد علي إبراهيم" dir="rtl">
+            <div class="field-error" id="err-fullName">⚠ يرجى إدخال الاسم الرباعي كاملاً باللغة العربية</div>
+          </div>
+
+          <div class="grid-2">
+            <div class="field">
+              <label>الرقم القومي <span class="req">*</span></label>
+              <input type="text" id="nationalId" maxlength="14" placeholder="14 رقم" dir="ltr" style="letter-spacing:2px;">
+              <div class="field-error" id="err-nationalId">⚠ الرقم القومي يجب أن يكون 14 رقمًا</div>
+            </div>
+            <div class="field">
+              <label>النوع <span class="req">*</span></label>
+              <div class="radio-group" id="gender-group">
+                <label class="radio-opt" onclick="selectRadio('gender','ذكر',this)">
+                  <input type="radio" name="gender" value="ذكر"> 👨 ذكر
+                </label>
+                <label class="radio-opt" onclick="selectRadio('gender','أنثى',this)">
+                  <input type="radio" name="gender" value="أنثى"> 👩 أنثى
+                </label>
+              </div>
+              <div class="field-error" id="err-gender">⚠ يرجى تحديد النوع</div>
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div class="field">
+              <label>المحافظة <span class="req">*</span></label>
+              <select id="governorate">
+                <option value="">— اختر المحافظة —</option>
+                <option>القاهرة</option><option>الجيزة</option><option>الإسكندرية</option>
+                <option>بني سويف</option><option>الفيوم</option><option>المنيا</option>
+                <option>أسيوط</option><option>سوهاج</option><option>قنا</option>
+                <option>الأقصر</option><option>أسوان</option><option>البحر الأحمر</option>
+                <option>الدقهلية</option><option>الغربية</option><option>المنوفية</option>
+                <option>القليوبية</option><option>الشرقية</option><option>كفر الشيخ</option>
+                <option>البحيرة</option><option>الإسماعيلية</option><option>السويس</option>
+                <option>بورسعيد</option><option>دمياط</option><option>شمال سيناء</option>
+                <option>جنوب سيناء</option><option>وادي الجديد</option><option>مطروح</option>
+              </select>
+              <div class="field-error" id="err-governorate">⚠ يرجى اختيار المحافظة</div>
+            </div>
+
+            <div class="field">
+              <label>القسم بالمعهد <span class="req">*</span></label>
+              <select id="department">
+                <option value="">— اختر القسم —</option>
+                <option>قسم الأشعة</option>
+                <option>قسم المختبرات</option>
+                <option>قسم صحة المجتمع</option>
+                <option>قسم الإدارة</option>
+                <option>قسم التنفس الصناعي</option>
+                <option>قسم البصريات</option>
+                <option>قسم الأجهزة الطبية</option>
+                <option>قسم تركيبات الأسنان</option>
+                <option>أقسام أخرى</option>
+              </select>
+              <div class="field-error" id="err-department">⚠ يرجى اختيار القسم</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="nextStep(1)">
+            التالي <span>←</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SECTION 2: Academic ──────────────────────────── -->
+    <div class="section" id="section-2">
+      <div class="card-header">
+        <div class="card-header-icon">🎓</div>
+        <div>
+          <h2>البيانات الأكاديمية</h2>
+          <p>الخطوة الثانية من خمس خطوات</p>
+        </div>
+      </div>
+      <div class="card-body">
+
+        <div style="display:grid; gap:20px;">
+          <div class="grid-3">
+            <div class="field">
+              <label>سنة التخرج <span class="req">*</span></label>
+              <select id="graduationYear">
+                <option value="">— السنة —</option>
+              </select>
+              <div class="field-error" id="err-graduationYear">⚠ يرجى اختيار سنة التخرج</div>
+            </div>
+
+            <div class="field">
+              <label>التقدير <span class="req">*</span></label>
+              <select id="grade">
+                <option value="">— التقدير —</option>
+                <option>امتياز مع مرتبة الشرف</option>
+                <option>ممتاز</option>
+                <option>جيد جداً</option>
+                <option>جيد</option>
+                <option>مقبول</option>
+              </select>
+              <div class="field-error" id="err-grade">⚠ يرجى اختيار التقدير</div>
+            </div>
+
+            <div class="field">
+              <label>النسبة المئوية <span class="req">*</span> <span class="hint">(%)</span></label>
+              <input type="number" id="percentage" placeholder="مثال: 85.5" min="50" max="100" step="0.1">
+              <div class="pct-bar-wrap"><div class="pct-bar" id="pct-bar"></div></div>
+              <div class="field-error" id="err-percentage">⚠ يرجى إدخال النسبة المئوية</div>
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div class="field">
+              <label>المجموع <span class="hint">(الدرجات الكلية)</span></label>
+              <input type="text" id="total" placeholder="مثال: 1450 / 1800">
+            </div>
+
+            <div class="field" id="military-section" style="display:none;">
+              <label>الموقف من التجنيد <span class="req">*</span></label>
+              <select id="militaryStatus">
+                <option value="">— اختر —</option>
+                <option>أدى الخدمة العسكرية</option>
+                <option>معفى من الخدمة</option>
+                <option>مؤجل بسبب الدراسة</option>
+                <option>تحت الخدمة حالياً</option>
+                <option>لم يُستدعَ بعد</option>
+              </select>
+              <div class="field-error" id="err-militaryStatus">⚠ يرجى تحديد الموقف من التجنيد</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-outline" onclick="prevStep(2)">← السابق</button>
+          <button class="btn btn-primary" onclick="nextStep(2)">التالي ←</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SECTION 3: Contact ───────────────────────────── -->
+    <div class="section" id="section-3">
+      <div class="card-header">
+        <div class="card-header-icon">📱</div>
+        <div>
+          <h2>بيانات التواصل</h2>
+          <p>الخطوة الثالثة من خمس خطوات</p>
+        </div>
+      </div>
+      <div class="card-body">
+        <div style="display:grid; gap:20px;">
+          <div class="grid-2">
+            <div class="field">
+              <label>رقم التليفون <span class="req">*</span></label>
+              <input type="tel" id="phone" placeholder="01xxxxxxxxx" dir="ltr">
+              <div class="field-error" id="err-phone">⚠ يرجى إدخال رقم هاتف صحيح</div>
+            </div>
+            <div class="field">
+              <label>رقم الواتساب <span class="req">*</span></label>
+              <input type="tel" id="whatsapp" placeholder="01xxxxxxxxx" dir="ltr">
+              <div class="field-error" id="err-whatsapp">⚠ يرجى إدخال رقم واتساب صحيح</div>
+            </div>
+          </div>
+          <div class="field">
+            <label>البريد الإلكتروني <span class="req">*</span></label>
+            <input type="email" id="email" placeholder="example@email.com" dir="ltr">
+            <div class="field-error" id="err-email">⚠ يرجى إدخال بريد إلكتروني صحيح</div>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-outline" onclick="prevStep(3)">← السابق</button>
+          <button class="btn btn-primary" onclick="nextStep(3)">التالي ←</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SECTION 4: Documents ─────────────────────────── -->
+    <div class="section" id="section-4">
+      <div class="card-header">
+        <div class="card-header-icon">📎</div>
+        <div>
+          <h2>رفع المستندات</h2>
+          <p>الخطوة الرابعة من خمس خطوات</p>
+        </div>
+      </div>
+      <div class="card-body">
+
+        <div class="info-banner" style="margin-bottom:24px;">
+          <span class="info-banner-icon">📌</span>
+          <div class="info-banner-text">
+            يُرجى رفع صور واضحة وكاملة للمستندات. <strong>الصيغ المقبولة:</strong> JPG, PNG فقط — بحد أقصى 5MB لكل ملف. <strong>جميع المستندات اختيارية.</strong>
+          </div>
+        </div>
+
+        <!-- 1. شهادة التخرج -->
+        <div class="docs-section-title">١ — شهادة التخرج</div>
+        <div style="margin-bottom:20px;">
+          <div class="field">
+            <label>شهادة التخرج</label>
+            <div class="upload-area" id="upload-cert_grad">
+              <input type="file" accept="image/*" onchange="handleUpload(this,'cert_grad')">
+              <div class="upload-icon">📜</div>
+              <div class="upload-title">اضغط لرفع الملف</div>
+              <div class="upload-sub">JPG / PNG — حتى 5MB</div>
+              <div class="upload-spinner">⏳ جاري الرفع...</div>
+            </div>
+            <div class="upload-preview" id="preview-cert_grad">
+              <img id="img-cert_grad" src="" alt="">
+              <span class="upload-preview-name" id="name-cert_grad"></span>
+              <span style="color:var(--success)">✓</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. بيان درجات السنة الأولى -->
+        <div class="docs-section-title">٢ — بيان درجات السنة الأولى</div>
+        <div style="margin-bottom:20px;">
+          <div class="field">
+            <label>بيان درجات السنة الأولى</label>
+            <div class="upload-area" id="upload-grades_year1">
+              <input type="file" accept="image/*" onchange="handleUpload(this,'grades_year1')">
+              <div class="upload-icon">📊</div>
+              <div class="upload-title">اضغط لرفع الملف</div>
+              <div class="upload-sub">JPG / PNG — حتى 5MB</div>
+              <div class="upload-spinner">⏳ جاري الرفع...</div>
+            </div>
+            <div class="upload-preview" id="preview-grades_year1">
+              <img id="img-grades_year1" src="" alt="">
+              <span class="upload-preview-name" id="name-grades_year1"></span>
+              <span style="color:var(--success)">✓</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. بيان درجات السنة الثانية -->
+        <div class="docs-section-title">٣ — بيان درجات السنة الثانية</div>
+        <div style="margin-bottom:20px;">
+          <div class="field">
+            <label>بيان درجات السنة الثانية</label>
+            <div class="upload-area" id="upload-grades_year2">
+              <input type="file" accept="image/*" onchange="handleUpload(this,'grades_year2')">
+              <div class="upload-icon">📊</div>
+              <div class="upload-title">اضغط لرفع الملف</div>
+              <div class="upload-sub">JPG / PNG — حتى 5MB</div>
+              <div class="upload-spinner">⏳ جاري الرفع...</div>
+            </div>
+            <div class="upload-preview" id="preview-grades_year2">
+              <img id="img-grades_year2" src="" alt="">
+              <span class="upload-preview-name" id="name-grades_year2"></span>
+              <span style="color:var(--success)">✓</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. موقف من التجنيد (للذكور) -->
+        <div class="docs-section-title" id="military-doc-title">٤ — موقف من التجنيد <span style="font-size:12px; color:var(--text-3); font-weight:500;">(للذكور — تأدية أو إعفاء نهائي)</span></div>
+        <div style="margin-bottom:20px;">
+          <div class="field">
+            <label>موقف من التجنيد</label>
+            <div class="upload-area" id="upload-military_doc">
+              <input type="file" accept="image/*" onchange="handleUpload(this,'military_doc')">
+              <div class="upload-icon">🪖</div>
+              <div class="upload-title">اضغط لرفع الملف</div>
+              <div class="upload-sub">JPG / PNG — حتى 5MB</div>
+              <div class="upload-spinner">⏳ جاري الرفع...</div>
+            </div>
+            <div class="upload-preview" id="preview-military_doc">
+              <img id="img-military_doc" src="" alt="">
+              <span class="upload-preview-name" id="name-military_doc"></span>
+              <span style="color:var(--success)">✓</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. صورة البطاقة الشخصية -->
+        <div class="docs-section-title">٥ — صورة البطاقة الشخصية</div>
+        <div style="margin-bottom:20px;">
+          <div class="field">
+            <label>صورة البطاقة الشخصية</label>
+            <div class="upload-area" id="upload-id_card">
+              <input type="file" accept="image/*" onchange="handleUpload(this,'id_card')">
+              <div class="upload-icon">🪪</div>
+              <div class="upload-title">اضغط لرفع الملف</div>
+              <div class="upload-sub">JPG / PNG — حتى 5MB</div>
+              <div class="upload-spinner">⏳ جاري الرفع...</div>
+            </div>
+            <div class="upload-preview" id="preview-id_card">
+              <img id="img-id_card" src="" alt="">
+              <span class="upload-preview-name" id="name-id_card"></span>
+              <span style="color:var(--success)">✓</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 6. شهادة الميلاد -->
+        <div class="docs-section-title">٦ — شهادة الميلاد</div>
+        <div style="margin-bottom:20px;">
+          <div class="field">
+            <label>شهادة الميلاد</label>
+            <div class="upload-area" id="upload-birth_cert">
+              <input type="file" accept="image/*" onchange="handleUpload(this,'birth_cert')">
+              <div class="upload-icon">📋</div>
+              <div class="upload-title">اضغط لرفع الملف</div>
+              <div class="upload-sub">JPG / PNG — حتى 5MB</div>
+              <div class="upload-spinner">⏳ جاري الرفع...</div>
+            </div>
+            <div class="upload-preview" id="preview-birth_cert">
+              <img id="img-birth_cert" src="" alt="">
+              <span class="upload-preview-name" id="name-birth_cert"></span>
+              <span style="color:var(--success)">✓</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 7. موافقة جهة العمل -->
+        <div class="docs-section-title">٧ — موافقة جهة العمل</div>
+        <div style="margin-bottom:8px;">
+          <div class="field">
+            <label>موافقة جهة العمل</label>
+            <div class="upload-area" id="upload-work_letter">
+              <input type="file" accept="image/*" onchange="handleUpload(this,'work_letter')">
+              <div class="upload-icon">🏢</div>
+              <div class="upload-title">اضغط لرفع الملف</div>
+              <div class="upload-sub">JPG / PNG — حتى 5MB</div>
+              <div class="upload-spinner">⏳ جاري الرفع...</div>
+            </div>
+            <div class="upload-preview" id="preview-work_letter">
+              <img id="img-work_letter" src="" alt="">
+              <span class="upload-preview-name" id="name-work_letter"></span>
+              <span style="color:var(--success)">✓</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-outline" onclick="prevStep(4)">← السابق</button>
+          <button class="btn btn-primary" onclick="nextStep(4)">التالي ←</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SECTION 5: Review ────────────────────────────── -->
+    <div class="section" id="section-5">
+      <div class="card-header">
+        <div class="card-header-icon">✅</div>
+        <div>
+          <h2>مراجعة البيانات وإرسال الطلب</h2>
+          <p>الخطوة الخامسة — تحقق من بياناتك قبل الإرسال</p>
+        </div>
+      </div>
+      <div class="card-body">
+        <div id="review-content" style="display:grid; gap:16px;"></div>
+
+        <div class="btn-row">
+          <button class="btn btn-outline" onclick="prevStep(5)">← السابق</button>
+          <button class="btn btn-accent" id="submit-btn" onclick="submitForm()">
+            <span id="submit-text">إرسال الطلب 📨</span>
+            <span id="submit-spinner" style="display:none;"><span class="spinner"></span> جاري الإرسال...</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SUCCESS ───────────────────────────────────────── -->
+    <div class="section" id="section-success">
+      <div class="card-body">
+        <div class="success-screen">
+          <div class="success-circle">🎉</div>
+          <h2>تم إرسال طلبك بنجاح!</h2>
+          <p>شكرًا لتقديمك. سيتم مراجعة طلبك من قِبَل إدارة الكلية وإبلاغك بالنتيجة.</p>
+          <div class="app-id-box">
+            <div class="app-id-label">رقم طلبك المرجعي</div>
+            <div class="app-id-value" id="success-app-id">—</div>
+          </div>
+          <p style="font-size:13px; color:var(--text-3);">احتفظ بهذا الرقم للمتابعة مع إدارة الكلية.</p>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /.card -->
+</div><!-- /.form-container -->
+
+<script>
+// ============================================================
+// State
+// ============================================================
+let currentStep = 1;
+const totalSteps = 5;
+const uploadedDocs = {};
+const radioValues = {};
+
+// ============================================================
+// Beautiful Dialog System
+// ============================================================
+function showDialog({ type = 'error', title, subtitle, message, items = [], buttons }) {
+  const overlay   = document.getElementById('dialog-overlay');
+  const iconWrap  = document.getElementById('dialog-icon-wrap');
+  const icon      = document.getElementById('dialog-icon');
+  const titleEl   = document.getElementById('dialog-title');
+  const subtitleEl= document.getElementById('dialog-subtitle');
+  const msgEl     = document.getElementById('dialog-message');
+  const itemsEl   = document.getElementById('dialog-items');
+  const footer    = document.getElementById('dialog-footer');
+
+  const typeMap = {
+    error:   { icon: '❌', cls: 'error',   btnCls: 'dialog-btn-primary' },
+    success: { icon: '✅', cls: 'success', btnCls: 'dialog-btn-primary' },
+    warning: { icon: '⚠️', cls: 'warning', btnCls: 'dialog-btn-primary' },
+    info:    { icon: 'ℹ️', cls: 'info',    btnCls: 'dialog-btn-primary' },
+  };
+  const t = typeMap[type] || typeMap.error;
+
+  iconWrap.className = `dialog-icon-wrap ${t.cls}`;
+  icon.textContent = t.icon;
+  titleEl.textContent = title;
+  subtitleEl.textContent = subtitle || 'كلية تكنولوجيا العلوم الصحية التطبيقية';
+  msgEl.innerHTML = message || '';
+  msgEl.style.display = message ? '' : 'none';
+
+  itemsEl.innerHTML = items.map(item =>
+    `<div class="dialog-item">${item}</div>`
+  ).join('');
+  itemsEl.style.display = items.length ? '' : 'none';
+
+  if (buttons) {
+    footer.innerHTML = buttons.map(b =>
+      `<button class="dialog-btn ${b.cls || t.btnCls}" onclick="${b.action}">${b.label}</button>`
+    ).join('');
+  } else {
+    footer.innerHTML = `<button class="dialog-btn dialog-btn-primary" onclick="closeDialog()">حسناً، فهمت</button>`;
+  }
+
+  overlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeDialog() {
+  document.getElementById('dialog-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function closeDialogOnOverlay(e) {
+  if (e.target === document.getElementById('dialog-overlay')) closeDialog();
+}
+
+// Keyboard ESC to close dialog
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeDialog();
+});
+
+// ============================================================
+// Status Inquiry
+// ============================================================
+function toggleInquiry() {
+  const btn   = document.getElementById('inquiry-toggle-btn');
+  const panel = document.getElementById('inquiry-panel');
+  const isOpen = panel.classList.contains('open');
+  panel.classList.toggle('open');
+  btn.classList.toggle('open');
+  if (!isOpen) {
+    setTimeout(() => document.getElementById('iq-national-id').focus(), 300);
+  }
+}
+
+async function checkStatus() {
+  const nidEl = document.getElementById('iq-national-id');
+  const nid   = nidEl.value.trim();
+
+  if (!/^\d{14}$/.test(nid)) {
+    nidEl.classList.add('error');
+    showDialog({
+      type: 'warning',
+      title: 'رقم قومي غير صحيح',
+      message: 'يرجى إدخال الرقم القومي كاملاً المكوّن من <strong>14 رقماً</strong> للاستعلام عن حالة طلبك.'
+    });
+    nidEl.focus();
+    return;
+  }
+  nidEl.classList.remove('error');
+
+  // Hide prev results
+  document.getElementById('iq-result').classList.remove('visible');
+  document.getElementById('iq-not-found').classList.remove('visible');
+
+  // Loading state
+  const btn = document.getElementById('iq-btn');
+  document.getElementById('iq-btn-text').style.display = 'none';
+  document.getElementById('iq-btn-spinner').style.display = '';
+  btn.disabled = true;
+
+  try {
+    const res  = await fetch(`${API_URL}?action=getApplications&search=${encodeURIComponent(nid)}`);
+    const json = await res.json();
+
+    if (json.success && json.data && json.data.length > 0) {
+      // Find exact match by national ID
+      const app = json.data.find(a => String(a['الرقم القومي']).trim() === nid) || json.data[0];
+      renderInquiryResult(app);
+    } else {
+      document.getElementById('iq-not-found').classList.add('visible');
+    }
+  } catch (err) {
+    showDialog({
+      type: 'error',
+      title: 'خطأ في الاتصال',
+      message: 'تعذّر الاتصال بالخادم. يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى.'
+    });
+  } finally {
+    document.getElementById('iq-btn-text').style.display = '';
+    document.getElementById('iq-btn-spinner').style.display = 'none';
+    btn.disabled = false;
+  }
+}
+
+function renderInquiryResult(app) {
+  const statusMap = {
+    'قيد المراجعة':      { cls: 'status-pending',  icon: '🕐', color: '#856404' },
+    'مقبول':             { cls: 'status-accepted', icon: '✅', color: '#155724' },
+    'مرفوض':             { cls: 'status-rejected', icon: '❌', color: '#721c24' },
+    'بانتظار المستندات': { cls: 'status-waiting',  icon: '📋', color: '#004085' },
+  };
+  const status  = app['الحالة'] || 'غير محدد';
+  const st      = statusMap[status] || { cls: '', icon: '❓', color: 'var(--text-2)' };
+
+  const header = document.getElementById('iq-result-header');
+  header.style.background = st.cls === 'status-accepted' ? 'var(--success-bg)' :
+                            st.cls === 'status-rejected' ? 'var(--danger-bg)'  :
+                            st.cls === 'status-waiting'  ? '#e8f2ff'           : 'var(--warning-bg)';
+  header.innerHTML = `
+    <div style="font-size:26px;">${st.icon}</div>
+    <div>
+      <div style="font-size:13px; color:var(--text-3); font-weight:600; margin-bottom:4px;">حالة الطلب</div>
+      <span class="status-badge ${st.cls}">${st.icon} ${status}</span>
+    </div>
+    <div style="margin-right:auto; text-align:left; direction:ltr;">
+      <div style="font-size:11px; color:var(--text-3); font-weight:600;">رقم الطلب</div>
+      <div style="font-size:13px; font-weight:800; color:var(--primary); font-family:monospace;">${app['ID'] || '—'}</div>
+    </div>
+  `;
+
+  const body = document.getElementById('iq-result-body');
+  body.innerHTML = [
+    ['الاسم',         app['الاسم الرباعي']],
+    ['تاريخ التقديم', app['تاريخ التقديم']],
+    ['القسم',         app['القسم']],
+    ['التقدير',       app['التقدير']],
+    ['سنة التخرج',    app['سنة التخرج']],
+    ['المحافظة',      app['المحافظة']],
+  ].map(([label, val]) => `
+    <div class="iq-field">
+      <span class="iq-field-label">${label}</span>
+      <span class="iq-field-value">${val || '—'}</span>
+    </div>
+  `).join('');
+
+  const notesWrap = document.getElementById('iq-notes-wrap');
+  let notesHTML = '';
+  if (app['سبب الرفض']) {
+    notesHTML += `<div class="iq-rejection-note">
+      <strong>⛔ سبب الرفض:</strong><br>${app['سبب الرفض']}
+    </div>`;
+  }
+  if (app['ملاحظات الإدارة']) {
+    notesHTML += `<div class="iq-admin-note">
+      <strong>📝 ملاحظات الإدارة:</strong><br>${app['ملاحظات الإدارة']}
+    </div>`;
+  }
+  notesWrap.innerHTML = notesHTML;
+
+  document.getElementById('iq-result').classList.add('visible');
+  document.getElementById('iq-result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ============================================================
+// Init
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+  // Fill graduation years (last 15 years, exclude more than 10 for hint only)
+  const yearSel = document.getElementById('graduationYear');
+  const now = new Date().getFullYear();
+  for (let y = now; y >= now - 15; y--) {
+    yearSel.innerHTML += `<option value="${y}">${y}</option>`;
+  }
+
+  // Percentage live bar
+  document.getElementById('percentage').addEventListener('input', e => {
+    const v = parseFloat(e.target.value) || 0;
+    const bar = document.getElementById('pct-bar');
+    bar.style.width = Math.min(v, 100) + '%';
+    bar.style.background = v >= 85 ? '#0ea89e' : v >= 70 ? '#c8972b' : '#c0392b';
+  });
+});
+
+// ============================================================
+// Radio selection
+// ============================================================
+function selectRadio(name, value, el) {
+  radioValues[name] = value;
+  document.querySelectorAll(`[onclick*="selectRadio('${name}"]`).forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+
+  // Show/hide military
+  if (name === 'gender') {
+    const ms = document.getElementById('military-section');
+    ms.style.display = value === 'ذكر' ? '' : 'none';
+  }
+}
+
+// ============================================================
+// Upload to ImgBB
+// ============================================================
+async function handleUpload(input, docKey) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const area = document.getElementById(`upload-${docKey}`);
+  const preview = document.getElementById(`preview-${docKey}`);
+  const imgEl = document.getElementById(`img-${docKey}`);
+  const nameEl = document.getElementById(`name-${docKey}`);
+
+  // Show uploading state
+  area.classList.add('uploading');
+
+  try {
+    // Convert to base64
+    const base64 = await fileToBase64(file);
+    const b64data = base64.split(',')[1];
+
+    const fd = new FormData();
+    fd.append('key', IMGBB_KEY);
+    fd.append('image', b64data);
+    fd.append('name', `${docKey}_${Date.now()}`);
+
+    const res = await fetch('https://api.imgbb.com/1/upload', { method: 'POST', body: fd });
+    const json = await res.json();
+
+    if (json.success) {
+      uploadedDocs[docKey] = json.data.url;
+      const thumb = json.data.thumb?.url || json.data.display_url;
+
+      imgEl.src = thumb;
+      nameEl.textContent = file.name;
+      preview.style.display = 'flex';
+      area.style.border = '2px solid var(--accent)';
+      area.style.background = 'var(--accent-light)';
+
+      // Clear error
+      const errEl = document.getElementById(`err-${docKey}`);
+      if (errEl) { errEl.classList.remove('visible'); }
+    } else {
+      showDialog({
+        type: 'error',
+        title: 'فشل رفع الملف',
+        message: 'تعذّر رفع الملف إلى الخادم. يرجى التحقق من حجم الملف (الحد الأقصى 5MB) وإعادة المحاولة.'
+      });
+    }
+  } catch (err) {
+    showDialog({
+      type: 'error',
+      title: 'خطأ أثناء رفع الملف',
+      message: `حدث خطأ غير متوقع أثناء رفع الملف.<br><span style="font-size:12px;color:var(--text-3);">${err.message}</span>`
+    });
+  } finally {
+    area.classList.remove('uploading');
+  }
+}
+
+function fileToBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+
+// ============================================================
+// Validation
+// ============================================================
+const validators = {
+  1: () => {
+    let ok = true;
+    const name = document.getElementById('fullName').value.trim();
+    const nameWords = name.split(/\s+/).filter(Boolean);
+    if (nameWords.length < 4 || !/^[\u0600-\u06FF\s]+$/.test(name)) {
+      showError('fullName', true); ok = false;
+    } else hideError('fullName');
+
+    const nid = document.getElementById('nationalId').value.trim();
+    if (!/^\d{14}$/.test(nid)) { showError('nationalId', true); ok = false; }
+    else hideError('nationalId');
+
+    if (!radioValues.gender) { showError('gender', true); ok = false; }
+    else hideError('gender');
+
+    if (!document.getElementById('governorate').value) { showError('governorate', true); ok = false; }
+    else hideError('governorate');
+
+    if (!document.getElementById('department').value) { showError('department', true); ok = false; }
+    else hideError('department');
+
+    return ok;
+  },
+  2: () => {
+    let ok = true;
+    if (!document.getElementById('graduationYear').value) { showError('graduationYear', true); ok = false; }
+    else hideError('graduationYear');
+
+    if (!document.getElementById('grade').value) { showError('grade', true); ok = false; }
+    else hideError('grade');
+
+    const pct = parseFloat(document.getElementById('percentage').value);
+    if (!pct || pct < 50 || pct > 100) { showError('percentage', true); ok = false; }
+    else hideError('percentage');
+
+    if (radioValues.gender === 'ذكر' && !document.getElementById('militaryStatus').value) {
+      showError('militaryStatus', true); ok = false;
+    } else hideError('militaryStatus');
+
+    return ok;
+  },
+  3: () => {
+    let ok = true;
+    const phone = document.getElementById('phone').value.trim();
+    if (!/^01[0-2,5]\d{8}$/.test(phone)) { showError('phone', true); ok = false; }
+    else hideError('phone');
+
+    const wa = document.getElementById('whatsapp').value.trim();
+    if (!/^01[0-2,5]\d{8}$/.test(wa)) { showError('whatsapp', true); ok = false; }
+    else hideError('whatsapp');
+
+    const email = document.getElementById('email').value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showError('email', true); ok = false; }
+    else hideError('email');
+
+    return ok;
+  },
+  4: () => {
+    // جميع المستندات اختيارية — لا يوجد تحقق إجباري
+    return true;
+  }
+};
+
+function showError(id, show) {
+  const el = document.getElementById('err-' + id);
+  const inp = document.getElementById(id);
+  if (el) el.classList.toggle('visible', show);
+  if (inp) inp.classList.toggle('error', show);
+}
+
+function hideError(id) { showError(id, false); }
+
+// ============================================================
+// Step Navigation
+// ============================================================
+function nextStep(from) {
+  if (from === 1 && validators[1]()) {
+    goToStep(2);
+  } else if (from === 2 && validators[2]()) {
+    checkEligibility().then(eligible => {
+      if (eligible) goToStep(3);
+    });
+  } else if (from === 3 && validators[3]()) {
+    goToStep(4);
+  } else if (from === 4 && validators[4]()) {
+    buildReview();
+    goToStep(5);
+  }
+}
+
+function prevStep(from) { goToStep(from - 1); }
+
+function goToStep(n) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  if (n === 'success') {
+    document.getElementById('section-success').classList.add('active');
+  } else {
+    document.querySelector(`#section-${n}`)?.classList.add('active');
+    currentStep = n;
+    updateProgress();
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function updateProgress() {
+  for (let i = 1; i <= 5; i++) {
+    const dot = document.getElementById(`step-dot-${i}`);
+    dot.classList.remove('active', 'done');
+    if (i < currentStep) dot.classList.add('done');
+    else if (i === currentStep) dot.classList.add('active');
+  }
+  for (let i = 1; i <= 4; i++) {
+    const line = document.getElementById(`line-${i}-${i+1}`);
+    if (line) line.classList.toggle('done', i < currentStep);
+  }
+}
+
+// ============================================================
+// Eligibility check (client-side)
+// ============================================================
+async function checkEligibility() {
+  const reasons = [];
+  const nid = document.getElementById('nationalId').value;
+  const gradYear = parseInt(document.getElementById('graduationYear').value);
+  const grade = document.getElementById('grade').value;
+  const now = new Date();
+
+  // Age from NID
+  if (nid.length === 14) {
+    const century = nid[0] === '2' ? 1900 : 2000;
+    const by = century + parseInt(nid.substring(1, 3));
+    const bm = parseInt(nid.substring(3, 5));
+    const bd = parseInt(nid.substring(5, 7));
+    let age = now.getFullYear() - by;
+    if (now.getMonth() + 1 < bm || (now.getMonth() + 1 === bm && now.getDate() < bd)) age--;
+
+    if (age > 30) {
+      reasons.push(`❌ <strong>تجاوز حد السن:</strong> عمرك <strong>${age} سنة</strong> والحد الأقصى المسموح به <strong>30 سنة</strong>.`);
+    }
+  }
+
+  // Years since grad
+  if (gradYear) {
+    const since = now.getFullYear() - gradYear;
+    if (since > 10) {
+      reasons.push(`❌ <strong>تجاوز الحد الزمني للتخرج:</strong> مر على تخرجك <strong>${since} سنوات</strong> والحد الأقصى <strong>10 سنوات</strong>.`);
+    }
+  }
+
+  // Grade
+  if (grade && !['جيد جداً','ممتاز','امتياز مع مرتبة الشرف'].includes(grade)) {
+    reasons.push(`❌ <strong>التقدير غير مؤهل:</strong> تقديرك <strong>"${grade}"</strong> والحد الأدنى المطلوب هو <strong>"جيد جداً"</strong> على الأقل.`);
+  }
+
+  if (reasons.length > 0) {
+    showRejection(reasons);
+    return false;
+  }
+
+  hideRejection();
+  return true;
+}
+
+function showRejection(reasons) {
+  // Also update the inline block
+  document.getElementById('rejection-wrap').style.display = '';
+  const alertEl = document.getElementById('rejection-alert');
+  alertEl.style.display = '';
+  const rrEl = document.getElementById('rejection-reasons');
+  rrEl.innerHTML = reasons.map(r => `<div class="rejection-reason">${r}</div>`).join('');
+
+  // Show beautiful dialog
+  const cleanReasons = reasons.map(r => r.replace(/<strong>/g,'').replace(/<\/strong>/g,''));
+  showDialog({
+    type: 'error',
+    title: 'عذراً — لا يمكن استكمال التقديم',
+    subtitle: 'لا تستوفي متطلبات القبول المحددة',
+    message: 'تم رفض طلبك تلقائياً للأسباب التالية. إذا كنت تعتقد أن هناك خطأً، يُرجى التواصل مع إدارة الكلية.',
+    items: cleanReasons,
+    buttons: [
+      { label: 'مراجعة البيانات', cls: 'dialog-btn-secondary', action: 'closeDialog(); goToStep(2);' },
+      { label: 'التواصل مع الإدارة', cls: 'dialog-btn-primary', action: 'closeDialog()' }
+    ]
+  });
+}
+
+function hideRejection() {
+  document.getElementById('rejection-wrap').style.display = 'none';
+}
+
+// ============================================================
+// Build Review
+// ============================================================
+function buildReview() {
+  const docLabels = {
+    cert_grad:    'شهادة التخرج',
+    grades_year1: 'بيان درجات السنة الأولى',
+    grades_year2: 'بيان درجات السنة الثانية',
+    military_doc: 'موقف من التجنيد',
+    id_card:      'صورة البطاقة الشخصية',
+    birth_cert:   'شهادة الميلاد',
+    work_letter:  'موافقة جهة العمل'
+  };
+
+  const sections = [
+    {
+      title: '👤 البيانات الشخصية',
+      rows: [
+        ['الاسم الرباعي', document.getElementById('fullName').value],
+        ['الرقم القومي', document.getElementById('nationalId').value],
+        ['النوع', radioValues.gender || '—'],
+        ['المحافظة', document.getElementById('governorate').value],
+        ['القسم', document.getElementById('department').value],
+      ]
+    },
+    {
+      title: '🎓 البيانات الأكاديمية',
+      rows: [
+        ['سنة التخرج', document.getElementById('graduationYear').value],
+        ['التقدير', document.getElementById('grade').value],
+        ['النسبة المئوية', document.getElementById('percentage').value + '%'],
+        ['المجموع', document.getElementById('total').value || '—'],
+        ...(radioValues.gender === 'ذكر' ? [['الموقف من التجنيد', document.getElementById('militaryStatus').value]] : [])
+      ]
+    },
+    {
+      title: '📱 بيانات التواصل',
+      rows: [
+        ['رقم التليفون', document.getElementById('phone').value],
+        ['رقم الواتساب', document.getElementById('whatsapp').value],
+        ['البريد الإلكتروني', document.getElementById('email').value],
+      ]
+    }
+  ];
+
+  let html = sections.map(sec => `
+    <div style="background:var(--surface-2); border-radius:var(--radius); padding:20px; border:1px solid var(--border);">
+      <div style="font-size:15px; font-weight:800; color:var(--primary); margin-bottom:14px;">${sec.title}</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        ${sec.rows.map(([k, v]) => `
+          <div style="display:flex; flex-direction:column; gap:3px;">
+            <span style="font-size:11px; font-weight:700; color:var(--text-3);">${k}</span>
+            <span style="font-size:14px; font-weight:600; color:var(--text-1);">${v || '—'}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+
+  // Documents
+  html += `<div style="background:var(--surface-2); border-radius:var(--radius); padding:20px; border:1px solid var(--border);">
+    <div style="font-size:15px; font-weight:800; color:var(--primary); margin-bottom:14px;">📎 المستندات المرفوعة</div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:12px;">
+      ${Object.entries(uploadedDocs).map(([k, url]) => `
+        <div style="text-align:center; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:10px; overflow:hidden;">
+          <img src="${url}" style="width:100%; height:70px; object-fit:cover; border-radius:6px; margin-bottom:6px;" onerror="this.src='data:image/svg+xml,<svg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 48 48\\'><text y=\\'32\\' font-size=\\'32\\'>📄</text></svg>'">
+          <div style="font-size:11px; font-weight:700; color:var(--text-2);">${docLabels[k] || k}</div>
+        </div>
+      `).join('')}
+    </div>
+  </div>`;
+
+  document.getElementById('review-content').innerHTML = html;
+}
+
+// ============================================================
+// Submit
+// ============================================================
+async function submitForm() {
+  const btn = document.getElementById('submit-btn');
+  document.getElementById('submit-text').style.display = 'none';
+  document.getElementById('submit-spinner').style.display = '';
+  btn.disabled = true;
+
+  const payload = {
+    action: 'submitApplication',
+    fullName: document.getElementById('fullName').value.trim(),
+    nationalId: document.getElementById('nationalId').value.trim(),
+    gender: radioValues.gender,
+    governorate: document.getElementById('governorate').value,
+    department: document.getElementById('department').value,
+    graduationYear: document.getElementById('graduationYear').value,
+    grade: document.getElementById('grade').value,
+    percentage: document.getElementById('percentage').value,
+    total: document.getElementById('total').value,
+    phone: document.getElementById('phone').value.trim(),
+    whatsapp: document.getElementById('whatsapp').value.trim(),
+    email: document.getElementById('email').value.trim(),
+    militaryStatus: radioValues.gender === 'ذكر' ? document.getElementById('militaryStatus').value : null,
+    docs: uploadedDocs
+  };
+
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    const json = await res.json();
+
+    if (json.success) {
+      document.getElementById('success-app-id').textContent = json.applicationId;
+      goToStep('success');
+      document.querySelector('.steps-track').style.display = 'none';
+    } else if (json.rejected) {
+      showRejection(json.reasons);
+      goToStep(2);
+    } else {
+      showDialog({
+        type: 'error',
+        title: 'خطأ في إرسال الطلب',
+        message: `حدث خطأ أثناء إرسال طلبك. يرجى المحاولة مرة أخرى أو التواصل مع إدارة الكلية.<br>
+          <span style="font-size:12px;color:var(--text-3);">التفاصيل: ${json.message || 'خطأ غير محدد'}</span>`
+      });
+    }
+  } catch (err) {
+    showDialog({
+      type: 'error',
+      title: 'تعذّر الاتصال بالخادم',
+      message: 'يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى. إذا استمرت المشكلة، تواصل مع إدارة الكلية.'
+    });
+  } finally {
+    document.getElementById('submit-text').style.display = '';
+    document.getElementById('submit-spinner').style.display = 'none';
+    btn.disabled = false;
+  }
+}
+
+</script>
+</body>
+</html>
