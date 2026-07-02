@@ -321,6 +321,7 @@
   }
 
   .upload-spinner { display: none; }
+  .upload-area.error { border-color: var(--danger); background: var(--danger-bg); }
   .upload-area.uploading { pointer-events: none; }
   .upload-area.uploading .upload-spinner { display: block; }
   .upload-area.uploading .upload-icon,
@@ -1112,7 +1113,7 @@
         <div class="info-banner" style="margin-bottom:24px;">
           <span class="info-banner-icon">📌</span>
           <div class="info-banner-text">
-            يُرجى رفع صور واضحة وكاملة للمستندات. <strong>الصيغ المقبولة:</strong> JPG, PNG فقط — بحد أقصى 5MB لكل ملف. <strong>جميع المستندات اختيارية.</strong>
+            يُرجى رفع صور واضحة وكاملة للمستندات. <strong>الصيغ المقبولة:</strong> JPG, PNG فقط — بحد أقصى 5MB لكل ملف. <strong>المستندات المميزة بـ (*) إجبارية</strong> وباقي المستندات اختيارية.
           </div>
         </div>
 
@@ -1120,7 +1121,7 @@
         <div class="docs-section-title">١ — شهادة التخرج</div>
         <div style="margin-bottom:20px;">
           <div class="field">
-            <label>شهادة التخرج</label>
+            <label>شهادة التخرج <span class="req">*</span></label>
             <div class="upload-area" id="upload-cert_grad">
               <input type="file" accept="image/*" onchange="handleUpload(this,'cert_grad')">
               <div class="upload-icon">📜</div>
@@ -1133,6 +1134,7 @@
               <span class="upload-preview-name" id="name-cert_grad"></span>
               <span style="color:var(--success)">✓</span>
             </div>
+            <div class="field-error" id="err-cert_grad">⚠ يرجى رفع صورة شهادة التخرج</div>
           </div>
         </div>
 
@@ -1140,7 +1142,7 @@
         <div class="docs-section-title">٢ — بيان درجات السنة الأولى</div>
         <div style="margin-bottom:20px;">
           <div class="field">
-            <label>بيان درجات السنة الأولى</label>
+            <label>بيان درجات السنة الأولى <span class="req">*</span></label>
             <div class="upload-area" id="upload-grades_year1">
               <input type="file" accept="image/*" onchange="handleUpload(this,'grades_year1')">
               <div class="upload-icon">📊</div>
@@ -1153,6 +1155,7 @@
               <span class="upload-preview-name" id="name-grades_year1"></span>
               <span style="color:var(--success)">✓</span>
             </div>
+            <div class="field-error" id="err-grades_year1">⚠ يرجى رفع بيان درجات السنة الأولى</div>
           </div>
         </div>
 
@@ -1160,7 +1163,7 @@
         <div class="docs-section-title">٣ — بيان درجات السنة الثانية</div>
         <div style="margin-bottom:20px;">
           <div class="field">
-            <label>بيان درجات السنة الثانية</label>
+            <label>بيان درجات السنة الثانية <span class="req">*</span></label>
             <div class="upload-area" id="upload-grades_year2">
               <input type="file" accept="image/*" onchange="handleUpload(this,'grades_year2')">
               <div class="upload-icon">📊</div>
@@ -1173,6 +1176,7 @@
               <span class="upload-preview-name" id="name-grades_year2"></span>
               <span style="color:var(--success)">✓</span>
             </div>
+            <div class="field-error" id="err-grades_year2">⚠ يرجى رفع بيان درجات السنة الثانية</div>
           </div>
         </div>
 
@@ -1673,16 +1677,29 @@ const validators = {
     return ok;
   },
   4: () => {
-    // جميع المستندات اختيارية — لا يوجد تحقق إجباري
-    return true;
+    let ok = true;
+
+    if (!uploadedDocs['cert_grad']) { showError('cert_grad', true); ok = false; }
+    else showError('cert_grad', false);
+
+    if (!uploadedDocs['grades_year1']) { showError('grades_year1', true); ok = false; }
+    else showError('grades_year1', false);
+
+    if (!uploadedDocs['grades_year2']) { showError('grades_year2', true); ok = false; }
+    else showError('grades_year2', false);
+
+    // باقي المستندات تبقى اختيارية
+    return ok;
   }
 };
 
 function showError(id, show) {
   const el = document.getElementById('err-' + id);
   const inp = document.getElementById(id);
+  const uploadArea = document.getElementById('upload-' + id);
   if (el) el.classList.toggle('visible', show);
   if (inp) inp.classList.toggle('error', show);
+  if (uploadArea) uploadArea.classList.toggle('error', show);
 }
 
 function hideError(id) { showError(id, false); }
