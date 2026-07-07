@@ -1017,8 +1017,9 @@
         </div>
 
         <div class="btn-row">
-          <button class="btn btn-primary" onclick="nextStep(1)">
-            التالي <span>←</span>
+          <button class="btn btn-primary" id="next-step1-btn" onclick="nextStep(1)">
+            <span id="next-step1-text">التالي <span>←</span></span>
+            <span id="next-step1-spinner" class="spinner" style="display:none;"></span>
           </button>
         </div>
       </div>
@@ -1428,6 +1429,46 @@ function toggleInquiry() {
 // ============================================================
 // Edit submitted application
 // ============================================================
+// يتحقق إن كان يوجد طلب مُرسَل بالفعل بنفس الرقم القومي
+async function findApplicationByNationalId(nid) {
+  const res  = await fetch(`${API_URL}?action=getApplications&search=${encodeURIComponent(nid)}`);
+  const json = await res.json();
+  if (json.success && json.data && json.data.length > 0) {
+    return json.data.find(a => String(a['الرقم القومي']).trim() === nid) || null;
+  }
+  return null;
+}
+
+// يظهر عندما يحاول المستخدم تقديم طلب جديد وهو لديه طلب مُرسَل بالفعل
+function showDuplicateApplicationDialog(app) {
+  const status = app['الحالة'] || 'قيد المراجعة';
+  const editableStatuses = ['قيد المراجعة', 'بانتظار المستندات', 'مرفوض'];
+  const canEdit = editableStatuses.includes(status);
+
+  showDialog({
+    type: 'warning',
+    title: 'لديك طلب مُرسَل بالفعل',
+    subtitle: `رقم الطلب: ${app['ID'] || '—'} — الحالة: ${status}`,
+    message: canEdit
+      ? 'لا يمكن تقديم أكثر من طلب واحد بنفس الرقم القومي. يمكنك تعديل بيانات طلبك الحالي بدلاً من ذلك.'
+      : 'لا يمكن تقديم أكثر من طلب واحد بنفس الرقم القومي، وقد تم قبول طلبك بالفعل. لأي استفسار، تواصل مع إدارة الكلية.',
+    buttons: canEdit
+      ? [
+          { label: 'إغلاق', cls: 'dialog-btn-secondary', action: 'closeDialog()' },
+          { label: 'تعديل طلبي', cls: 'dialog-btn-primary', action: 'closeDialog(); goEditFromDuplicate();' }
+        ]
+      : [
+          { label: 'حسناً', cls: 'dialog-btn-primary', action: 'closeDialog()' }
+        ]
+  });
+
+  lastInquiryApp = app;
+}
+
+function goEditFromDuplicate() {
+  startEditApplication();
+}
+
 function driveThumbFromUrl(url) {
   const m = String(url || '').match(/\/d\/([^/]+)/);
   return m ? `https://drive.google.com/thumbnail?id=${m[1]}&sz=w400` : url;
@@ -1855,9 +1896,32 @@ function hideError(id) { showError(id, false); }
 // ============================================================
 // Step Navigation
 // ============================================================
-function nextStep(from) {
+async function nextStep(from) {
   if (from === 1 && validators[1]()) {
-    goToStep(2);
+    // إذا كان المستخدم يقوم بتعديل طلب مُرسَل مسبقًا، لا داعي لإعادة الفحص
+    if (editMode) { goToStep(2); return; }
+
+    const nid = document.getElementById('nationalId').value.trim();
+    const btn = document.getElementById('next-step1-btn');
+    document.getElementById('next-step1-text').style.display = 'none';
+    document.getElementById('next-step1-spinner').style.display = '';
+    btn.disabled = true;
+
+    try {
+      const existing = await findApplicationByNationalId(nid);
+      if (existing) {
+        showDuplicateApplicationDialog(existing);
+      } else {
+        goToStep(2);
+      }
+    } catch (err) {
+      // تعذّر التحقق (مشكلة اتصال) — نسمح بالمتابعة حتى لا يتعطّل المستخدم بالكامل
+      goToStep(2);
+    } finally {
+      document.getElementById('next-step1-text').style.display = '';
+      document.getElementById('next-step1-spinner').style.display = 'none';
+      btn.disabled = false;
+    }
   } else if (from === 2 && validators[2]()) {
     checkEligibility().then(eligible => {
       if (eligible) goToStep(3);
