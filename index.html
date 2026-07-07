@@ -1658,6 +1658,10 @@ function renderInquiryResult(app) {
 
   const notesWrap = document.getElementById('iq-notes-wrap');
   let notesHTML = '';
+  notesHTML += `
+    <button class="btn btn-outline" style="width:100%; justify-content:center; margin-top:4px;" onclick="printApplicationSummary()">
+      🖨️ طباعة بيانات الطلب
+    </button>`;
   if (app['سبب الرفض']) {
     notesHTML += `<div class="iq-rejection-note">
       <strong>⛔ سبب الرفض:</strong><br>${app['سبب الرفض']}
@@ -1687,6 +1691,141 @@ function renderInquiryResult(app) {
   document.getElementById('iq-result').classList.add('visible');
   document.getElementById('iq-result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
+
+// ============================================================
+// Print application summary
+// ============================================================
+function printApplicationSummary() {
+  const app = lastInquiryApp;
+  if (!app) return;
+
+  const statusMap = {
+    'قيد المراجعة':      { label: 'قيد المراجعة',      color: '#856404', bg: '#fff8e1' },
+    'مقبول':             { label: 'مقبول',             color: '#155724', bg: '#e9f7ef' },
+    'مرفوض':             { label: 'مرفوض',             color: '#721c24', bg: '#fdecea' },
+    'بانتظار المستندات': { label: 'بانتظار المستندات', color: '#004085', bg: '#e8f2ff' },
+  };
+  const status = app['الحالة'] || 'غير محدد';
+  const st = statusMap[status] || { label: status, color: '#4a6072', bg: '#f5f8fa' };
+
+  const rows = (pairs) => pairs.map(([label, val]) => `
+    <tr>
+      <td class="p-label">${label}</td>
+      <td class="p-value">${(val === undefined || val === null || val === '') ? '—' : val}</td>
+    </tr>
+  `).join('');
+
+  const now = new Date();
+  const printedAt = now.toLocaleString('ar-EG', { dateStyle: 'long', timeStyle: 'short' });
+
+  const html = `
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>طلب التحاق رقم ${app['ID'] || ''}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap');
+  * { box-sizing: border-box; margin:0; padding:0; }
+  body { font-family:'Cairo', sans-serif; color:#1a2b35; padding:32px; }
+  .p-header { display:flex; align-items:center; gap:14px; border-bottom:3px solid #1a6e8e; padding-bottom:16px; margin-bottom:22px; }
+  .p-logo { width:52px; height:52px; border-radius:12px; background:#e8f4f8; display:flex; align-items:center; justify-content:center; font-size:28px; }
+  .p-header h1 { font-size:19px; color:#1a6e8e; }
+  .p-header p { font-size:12px; color:#4a6072; margin-top:2px; }
+  .p-meta { margin-right:auto; text-align:left; direction:ltr; }
+  .p-meta div:first-child { font-size:11px; color:#7a93a3; font-weight:600; }
+  .p-meta div:last-child { font-size:15px; font-weight:800; color:#1a6e8e; font-family:monospace; }
+  .p-status { display:inline-flex; align-items:center; gap:8px; padding:8px 18px; border-radius:10px; font-weight:800; font-size:14px; background:${st.bg}; color:${st.color}; margin-bottom:22px; }
+  .p-section-title { font-size:13px; font-weight:800; color:#1a6e8e; margin:22px 0 8px; padding-bottom:6px; border-bottom:1px solid #d4e3ea; }
+  table { width:100%; border-collapse:collapse; }
+  td { padding:8px 6px; font-size:13px; border-bottom:1px solid #eef3f6; }
+  .p-label { color:#7a93a3; font-weight:600; width:38%; }
+  .p-value { color:#1a2b35; font-weight:700; }
+  .p-note { margin-top:10px; padding:12px 14px; border-radius:8px; font-size:13px; }
+  .p-note.reject { background:#fdecea; color:#721c24; }
+  .p-note.admin { background:#e8f2ff; color:#004085; }
+  .p-footer { margin-top:36px; padding-top:14px; border-top:1px solid #d4e3ea; font-size:11px; color:#7a93a3; display:flex; justify-content:space-between; }
+  @media print {
+    body { padding:12mm; }
+    @page { margin:12mm; }
+  }
+</style>
+</head>
+<body>
+  <div class="p-header">
+    <div class="p-logo">🏥</div>
+    <div>
+      <h1>كلية تكنولوجيا العلوم الصحية التطبيقية</h1>
+      <p>جامعة بني سويف — بيانات طلب الالتحاق بالبرنامج</p>
+    </div>
+    <div class="p-meta">
+      <div>رقم الطلب</div>
+      <div>${app['ID'] || '—'}</div>
+    </div>
+  </div>
+
+  <div class="p-status">حالة الطلب: ${st.label}</div>
+
+  <div class="p-section-title">البيانات الشخصية</div>
+  <table>
+    ${rows([
+      ['الاسم الرباعي', app['الاسم الرباعي']],
+      ['الرقم القومي', app['الرقم القومي']],
+      ['النوع', app['النوع']],
+      ['المحافظة', app['المحافظة']],
+      ['القسم المطلوب', app['القسم']],
+    ])}
+  </table>
+
+  <div class="p-section-title">البيانات الأكاديمية</div>
+  <table>
+    ${rows([
+      ['سنة التخرج', app['سنة التخرج']],
+      ['التقدير', app['التقدير']],
+      ['النسبة المئوية', app['النسبة المئوية']],
+      ['المجموع', app['المجموع']],
+      ['الموقف من التجنيد', app['الموقف من التجنيد']],
+    ])}
+  </table>
+
+  <div class="p-section-title">بيانات التواصل</div>
+  <table>
+    ${rows([
+      ['رقم التليفون', app['رقم التليفون']],
+      ['رقم الواتساب', app['رقم الواتساب']],
+      ['البريد الإلكتروني', app['البريد الإلكتروني']],
+      ['تاريخ التقديم', app['تاريخ التقديم']],
+    ])}
+  </table>
+
+  ${app['سبب الرفض'] ? `<div class="p-note reject"><strong>⛔ سبب الرفض:</strong> ${app['سبب الرفض']}</div>` : ''}
+  ${app['ملاحظات الإدارة'] ? `<div class="p-note admin"><strong>📝 ملاحظات الإدارة:</strong> ${app['ملاحظات الإدارة']}</div>` : ''}
+
+  <div class="p-footer">
+    <span>تم الطباعة بتاريخ: ${printedAt}</span>
+    <span>هذه الورقة للاستخدام الشخصي ولا تُعد إثباتاً رسمياً للقبول</span>
+  </div>
+
+  <script>
+    window.onload = function () { window.print(); };
+  <\/script>
+</body>
+</html>`;
+
+  const win = window.open('', '_blank');
+  if (!win) {
+    showDialog({
+      type: 'warning',
+      title: 'تعذّر فتح نافذة الطباعة',
+      message: 'يبدو أن المتصفح يمنع النوافذ المنبثقة. يرجى السماح بالنوافذ المنبثقة لهذا الموقع ثم المحاولة مرة أخرى.'
+    });
+    return;
+  }
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
+}
+
 
 // ============================================================
 // Init
