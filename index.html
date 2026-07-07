@@ -9,7 +9,7 @@
      ⚙️ CONFIG - غيّر هذا الرابط برابط Web App الخاص بك
      ======================================================== -->
 <script>
-  const API_URL = 'https://script.google.com/macros/s/AKfycbwpA7Qcp164WfsELfdii7tVb2xsXa24QXkL5fHnsL5Q3VcbgUgYmg9aw70cxxI4bzUg/exec';
+  const API_URL = 'https://script.google.com/macros/s/AKfycbwcuQ594NSbsfVAqnK6VVsj_rmq5mGtQfJyRR-BS0N2aIswFOAHq4210UXpU0N0oXL6/exec';
 </script>
 
 <style>
@@ -362,6 +362,29 @@
   .info-banner-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
   .info-banner-text { font-size: 13px; color: var(--warning); line-height: 1.7; font-weight: 600; }
   .info-banner-text strong { font-weight: 800; }
+
+  /* ── Edit-mode banner ─────────────────────────────────── */
+  .edit-mode-banner {
+    max-width: 900px;
+    margin: 20px auto 0;
+    padding: 14px 20px;
+    background: var(--primary-xlt);
+    border: 1.5px solid var(--primary-light);
+    border-radius: var(--radius);
+    display: flex; align-items: center; gap: 14px;
+    flex-wrap: wrap;
+  }
+  .edit-mode-banner-text {
+    font-size: 13px; font-weight: 700; color: var(--primary);
+    line-height: 1.6; flex: 1; min-width: 220px;
+  }
+  .edit-mode-banner-cancel {
+    background: none; border: 1.5px solid var(--primary); color: var(--primary);
+    border-radius: var(--radius-sm); padding: 8px 16px;
+    font-family: var(--font-main); font-size: 12px; font-weight: 700;
+    cursor: pointer; white-space: nowrap; transition: all .2s;
+  }
+  .edit-mode-banner-cancel:hover { background: var(--primary); color: #fff; }
 
   /* ── Rejection alert ──────────────────────────────────── */
   .rejection-alert {
@@ -854,6 +877,15 @@
   </div>
 </div>
 
+<!-- ── Edit mode banner (يظهر عند تعديل طلب مُرسَل مسبقًا) ── -->
+<div class="edit-mode-banner" id="edit-mode-banner" style="display:none;">
+  <div class="edit-mode-banner-text">
+    ✏️ أنت الآن تُعدّل الطلب رقم <span id="edit-mode-app-id" style="font-family:monospace;"></span> —
+    سيتم إعادة طلبك لحالة «قيد المراجعة» بعد حفظ التعديلات.
+  </div>
+  <button class="edit-mode-banner-cancel" onclick="cancelEdit()">إلغاء والعودة لطلب جديد</button>
+</div>
+
 <!-- ── Progress ────────────────────────────────────────── -->
 <div class="progress-wrap">
   <div class="steps-track">
@@ -1293,9 +1325,9 @@
     <div class="section" id="section-success">
       <div class="card-body">
         <div class="success-screen">
-          <div class="success-circle">🎉</div>
-          <h2>تم إرسال طلبك بنجاح!</h2>
-          <p>شكرًا لتقديمك. سيتم مراجعة طلبك من قِبَل إدارة الكلية وإبلاغك بالنتيجة.</p>
+          <div class="success-circle" id="success-circle">🎉</div>
+          <h2 id="success-title">تم إرسال طلبك بنجاح!</h2>
+          <p id="success-desc">شكرًا لتقديمك. سيتم مراجعة طلبك من قِبَل إدارة الكلية وإبلاغك بالنتيجة.</p>
           <div class="app-id-box">
             <div class="app-id-label">رقم طلبك المرجعي</div>
             <div class="app-id-value" id="success-app-id">—</div>
@@ -1313,6 +1345,9 @@
 // State
 // ============================================================
 let currentStep = 1;
+let editMode = false;
+let editingAppId = null;
+let lastInquiryApp = null;
 const totalSteps = 5;
 const uploadedDocs = {};
 const radioValues = {};
@@ -1390,6 +1425,104 @@ function toggleInquiry() {
   }
 }
 
+// ============================================================
+// Edit submitted application
+// ============================================================
+function driveThumbFromUrl(url) {
+  const m = String(url || '').match(/\/d\/([^/]+)/);
+  return m ? `https://drive.google.com/thumbnail?id=${m[1]}&sz=w400` : url;
+}
+
+function startEditApplication() {
+  const app = lastInquiryApp;
+  if (!app) return;
+
+  editMode = true;
+  editingAppId = app['ID'];
+
+  // البيانات الشخصية
+  document.getElementById('fullName').value = app['الاسم الرباعي'] || '';
+  const nidEl = document.getElementById('nationalId');
+  nidEl.value = app['الرقم القومي'] || '';
+  nidEl.readOnly = true;
+  document.getElementById('governorate').value = app['المحافظة'] || '';
+  document.getElementById('department').value = app['القسم'] || '';
+
+  const gender = app['النوع'] || '';
+  if (gender) {
+    const genderRadio = document.querySelector(`.radio-opt[onclick*="selectRadio('gender','${gender}'"]`);
+    if (genderRadio) genderRadio.click();
+  }
+
+  // البيانات الأكاديمية
+  document.getElementById('graduationYear').value = app['سنة التخرج'] || '';
+  document.getElementById('grade').value = app['التقدير'] || '';
+  const pctEl = document.getElementById('percentage');
+  pctEl.value = String(app['النسبة المئوية'] || '').replace('%', '').trim();
+  pctEl.dispatchEvent(new Event('input'));
+  document.getElementById('total').value = app['المجموع'] || '';
+  if (gender === 'ذكر') {
+    document.getElementById('militaryStatus').value = app['الموقف من التجنيد'] || '';
+  }
+
+  // بيانات التواصل
+  document.getElementById('phone').value = app['رقم التليفون'] || '';
+  document.getElementById('whatsapp').value = app['رقم الواتساب'] || '';
+  document.getElementById('email').value = app['البريد الإلكتروني'] || '';
+
+  // المستندات المرفوعة مسبقًا
+  const docMap = {
+    cert_grad:    'شهادة التخرج',
+    grades_year1: 'بيان درجات السنة الأولى',
+    grades_year2: 'بيان درجات السنة الثانية',
+    military_doc: 'موقف من التجنيد',
+    id_card:      'صورة البطاقة الشخصية',
+    birth_cert:   'شهادة الميلاد',
+    work_letter:  'إفادة جهة العمل'
+  };
+  Object.keys(docMap).forEach(key => {
+    const url = app[docMap[key]];
+    if (!url) return;
+    uploadedDocs[key] = url;
+    const preview = document.getElementById(`preview-${key}`);
+    const imgEl    = document.getElementById(`img-${key}`);
+    const nameEl   = document.getElementById(`name-${key}`);
+    const area     = document.getElementById(`upload-${key}`);
+    if (imgEl) imgEl.src = driveThumbFromUrl(url);
+    if (nameEl) nameEl.textContent = 'مستند مرفوع مسبقًا (اضغط لاستبداله)';
+    if (preview) preview.style.display = 'flex';
+    if (area) {
+      area.style.border = '2px solid var(--accent)';
+      area.style.background = 'var(--accent-light)';
+      const errEl = document.getElementById(`err-${key}`);
+      if (errEl) errEl.classList.remove('visible');
+    }
+  });
+
+  // تفعيل واجهة وضع التعديل
+  document.getElementById('edit-mode-banner').style.display = 'flex';
+  document.getElementById('edit-mode-app-id').textContent = editingAppId;
+  document.getElementById('submit-text').textContent = 'حفظ التعديلات 💾';
+
+  // إغلاق لوحة الاستعلام والانتقال لبداية النموذج
+  document.getElementById('inquiry-panel').classList.remove('open');
+  document.getElementById('inquiry-toggle-btn').classList.remove('open');
+  goToStep(1);
+  document.querySelector('.form-container').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function cancelEdit() {
+  showDialog({
+    type: 'warning',
+    title: 'إلغاء التعديل',
+    message: 'هل تريد إلغاء التعديل والعودة لصفحة تقديم طلب جديد؟ سيتم فقد أي تغييرات لم تُحفظ.',
+    buttons: [
+      { label: 'تراجع', cls: 'dialog-btn-secondary', action: 'closeDialog()' },
+      { label: 'نعم، إلغاء', cls: 'dialog-btn-primary', action: 'closeDialog(); location.reload();' }
+    ]
+  });
+}
+
 async function checkStatus() {
   const nidEl = document.getElementById('iq-national-id');
   const nid   = nidEl.value.trim();
@@ -1441,6 +1574,7 @@ async function checkStatus() {
 }
 
 function renderInquiryResult(app) {
+  lastInquiryApp = app;
   const statusMap = {
     'قيد المراجعة':      { cls: 'status-pending',  icon: '🕐', color: '#856404' },
     'مقبول':             { cls: 'status-accepted', icon: '✅', color: '#155724' },
@@ -1493,6 +1627,20 @@ function renderInquiryResult(app) {
       <strong>📝 ملاحظات الإدارة:</strong><br>${app['ملاحظات الإدارة']}
     </div>`;
   }
+  // زر تعديل الطلب — يظهر فقط إذا كانت الحالة تسمح بالتعديل
+  const editableStatuses = ['قيد المراجعة', 'بانتظار المستندات', 'مرفوض'];
+  if (editableStatuses.includes(status)) {
+    notesHTML += `
+      <button class="btn btn-outline" style="width:100%; justify-content:center; margin-top:10px;" onclick="startEditApplication()">
+        ✏️ تعديل بيانات الطلب
+      </button>`;
+  } else if (status === 'مقبول') {
+    notesHTML += `
+      <div style="font-size:12px; color:var(--text-3); text-align:center; margin-top:10px; font-weight:600;">
+        تم قبول طلبك ولا يمكن تعديله. لأي استفسار، تواصل مع إدارة الكلية.
+      </div>`;
+  }
+
   notesWrap.innerHTML = notesHTML;
 
   document.getElementById('iq-result').classList.add('visible');
@@ -1907,7 +2055,8 @@ async function submitForm() {
   btn.disabled = true;
 
   const payload = {
-    action: 'submitApplication',
+    action: editMode ? 'updateApplication' : 'submitApplication',
+    ...(editMode ? { id: editingAppId } : {}),
     fullName: document.getElementById('fullName').value.trim(),
     nationalId: document.getElementById('nationalId').value.trim(),
     gender: radioValues.gender,
@@ -1933,8 +2082,14 @@ async function submitForm() {
 
     if (json.success) {
       document.getElementById('success-app-id').textContent = json.applicationId;
+      if (editMode) {
+        document.getElementById('success-circle').textContent = '✅';
+        document.getElementById('success-title').textContent = 'تم تحديث طلبك بنجاح!';
+        document.getElementById('success-desc').textContent = 'تم حفظ التعديلات، وأصبح طلبك «قيد المراجعة» مرة أخرى. سيتم إبلاغك بالنتيجة.';
+      }
       goToStep('success');
       document.querySelector('.steps-track').style.display = 'none';
+      document.getElementById('edit-mode-banner').style.display = 'none';
     } else if (json.rejected) {
       showRejection(json.reasons);
       goToStep(2);
