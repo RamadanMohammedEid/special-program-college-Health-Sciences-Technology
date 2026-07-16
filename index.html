@@ -1501,7 +1501,7 @@ function startEditApplication() {
   document.getElementById('graduationYear').value = app['سنة التخرج'] || '';
   document.getElementById('grade').value = app['التقدير'] || '';
   const pctEl = document.getElementById('percentage');
-  pctEl.value = String(app['النسبة المئوية'] || '').replace('%', '').trim();
+  pctEl.value = normalizePercentage(app['النسبة المئوية']);
   pctEl.dispatchEvent(new Event('input'));
   document.getElementById('total').value = app['المجموع'] || '';
   if (gender === 'ذكر') {
@@ -1614,6 +1614,19 @@ async function checkStatus() {
     document.getElementById('iq-btn-spinner').style.display = 'none';
     btn.disabled = false;
   }
+}
+
+// تنسيق النسبة المئوية: بعض الأحيان تُرجع الشيت القيمة ككسر عشري
+// (مثال: 0.8935 بدلاً من 89.35) بسبب تنسيق الخلية كنسبة مئوية في جوجل شيتس.
+// هذه الدالة تُرجع رقم النسبة الصحيح (بدون علامة %) بغض النظر عن شكل القيمة القادمة.
+function normalizePercentage(val) {
+  if (val === undefined || val === null || val === '') return '';
+  let num = parseFloat(String(val).replace('%', '').trim());
+  if (isNaN(num)) return String(val).replace('%', '').trim();
+  if (Math.abs(num) <= 1) num = num * 100;
+  // تقريب لأقرب رقمين عشريين مع إزالة الأصفار الزائدة
+  num = Math.round(num * 100) / 100;
+  return String(num);
 }
 
 function renderInquiryResult(app) {
@@ -1784,7 +1797,7 @@ function printApplicationSummary() {
     ${rows([
       ['سنة التخرج', app['سنة التخرج']],
       ['التقدير', app['التقدير']],
-      ['النسبة المئوية', app['النسبة المئوية']],
+      ['النسبة المئوية', app['النسبة المئوية'] === undefined || app['النسبة المئوية'] === null || app['النسبة المئوية'] === '' ? '' : normalizePercentage(app['النسبة المئوية']) + '%'],
       ['المجموع', app['المجموع']],
       ['الموقف من التجنيد', app['الموقف من التجنيد']],
     ])}
