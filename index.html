@@ -484,6 +484,36 @@
   .iq-not-found.visible { display: block; animation: fadeIn .3s ease; }
   .iq-not-found p { font-size: 14px; color: var(--text-2); font-weight: 600; margin-top: 8px; }
 
+  /* ── Multiple name-search results ─────────────────────── */
+  .iq-results-list {
+    margin-top: 20px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    display: none;
+  }
+  .iq-results-list.visible { display: block; animation: fadeIn .3s ease; }
+  .iq-results-hint {
+    padding: 12px 18px;
+    background: var(--surface-3);
+    font-size: 12px; font-weight: 700; color: var(--text-2);
+    border-bottom: 1.5px solid var(--border);
+  }
+  .iq-result-item {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .iq-result-item:last-child { border-bottom: none; }
+  .iq-result-item:hover { background: var(--primary-xlt); }
+  .iq-result-item-name { font-size: 14px; font-weight: 700; color: var(--text-1); }
+  .iq-result-item-sub { font-size: 12px; font-weight: 600; color: var(--text-3); margin-top: 2px; }
+  .iq-result-item-arrow { font-size: 14px; color: var(--primary); }
+
   /* ── Beautiful Dialog Box ──────────────────────────────── */
   .dialog-overlay {
     position: fixed; inset: 0;
@@ -672,9 +702,9 @@
     <div class="inquiry-panel" id="inquiry-panel">
       <div class="inquiry-input-row">
         <div class="field">
-          <label>الرقم القومي <span class="req">*</span> <span class="hint">(14 رقم)</span></label>
-          <input type="text" id="iq-national-id" maxlength="14" placeholder="أدخل الرقم القومي المكوّن من 14 رقماً" dir="ltr"
-            style="letter-spacing:2px;" onkeydown="if(event.key==='Enter') checkStatus()">
+          <label>الرقم القومي أو الاسم <span class="req">*</span> <span class="hint">(14 رقم، أو اسم الطالب)</span></label>
+          <input type="text" id="iq-national-id" placeholder="أدخل الرقم القومي (14 رقم) أو اسم الطالب"
+            onkeydown="if(event.key==='Enter') checkStatus()">
         </div>
         <button class="btn btn-primary" onclick="checkStatus()" id="iq-btn" style="padding:11px 24px; white-space:nowrap;">
           <span id="iq-btn-text">🔍 استعلام</span>
@@ -689,10 +719,16 @@
         <div id="iq-notes-wrap" style="padding:0 20px 18px;"></div>
       </div>
 
+      <!-- Multiple matches by name -->
+      <div class="iq-results-list" id="iq-results-list">
+        <div class="iq-results-hint" id="iq-results-hint"></div>
+        <div id="iq-results-items"></div>
+      </div>
+
       <!-- Not found -->
       <div class="iq-not-found" id="iq-not-found">
         <div style="font-size:36px;">🔎</div>
-        <p>لم يتم العثور على طلب مرتبط بهذا الرقم القومي.<br>
+        <p id="iq-not-found-text">لم يتم العثور على طلب مرتبط بهذا الرقم القومي.<br>
           <span style="font-size:12px; color:var(--text-3); font-weight:500;">تأكد من صحة الرقم القومي أو تواصل مع إدارة الكلية.</span>
         </p>
       </div>
@@ -728,7 +764,7 @@
         </div>
         <div class="closed-info-item">
           <div class="closed-info-icon">🔍</div>
-          <div class="closed-info-label">تابع حالة طلبك من<br>خانة الاستعلام بالاعلى</div>
+          <div class="closed-info-label">تابع حالة طلبك من<br>خانة الاستعلام أدناه</div>
         </div>
         <div class="closed-info-item">
           <div class="closed-info-icon">📢</div>
@@ -833,14 +869,17 @@ function normalizePercentage(val) {
 
 async function checkStatus() {
   const nidEl = document.getElementById('iq-national-id');
-  const nid   = nidEl.value.trim();
+  const query = nidEl.value.trim();
 
-  if (!/^\d{14}$/.test(nid)) {
+  const isNationalId = /^\d{14}$/.test(query);
+  const isNameQuery  = !isNationalId && query.replace(/\s/g, '').length >= 3;
+
+  if (!isNationalId && !isNameQuery) {
     nidEl.classList.add('error');
     showDialog({
       type: 'warning',
-      title: 'رقم قومي غير صحيح',
-      message: 'يرجى إدخال الرقم القومي كاملاً المكوّن من <strong>14 رقماً</strong> للاستعلام عن حالة طلبك.'
+      title: 'بيانات البحث غير كافية',
+      message: 'يرجى إدخال الرقم القومي كاملاً المكوّن من <strong>14 رقماً</strong>، أو اسم الطالب (3 أحرف على الأقل) للاستعلام عن حالة الطلب.'
     });
     nidEl.focus();
     return;
@@ -850,6 +889,7 @@ async function checkStatus() {
   // Hide prev results
   document.getElementById('iq-result').classList.remove('visible');
   document.getElementById('iq-not-found').classList.remove('visible');
+  document.getElementById('iq-results-list').classList.remove('visible');
 
   // Loading state
   const btn = document.getElementById('iq-btn');
@@ -858,14 +898,24 @@ async function checkStatus() {
   btn.disabled = true;
 
   try {
-    const res  = await fetch(`${API_URL}?action=getApplications&search=${encodeURIComponent(nid)}`);
+    const res  = await fetch(`${API_URL}?action=getApplications&search=${encodeURIComponent(query)}`);
     const json = await res.json();
 
     if (json.success && json.data && json.data.length > 0) {
-      // Find exact match by national ID
-      const app = json.data.find(a => String(a['الرقم القومي']).trim() === nid) || json.data[0];
-      renderInquiryResult(app);
+      if (isNationalId) {
+        // Find exact match by national ID
+        const app = json.data.find(a => String(a['الرقم القومي']).trim() === query) || json.data[0];
+        renderInquiryResult(app);
+      } else if (json.data.length === 1) {
+        renderInquiryResult(json.data[0]);
+      } else {
+        renderMultipleResults(json.data);
+      }
     } else {
+      const notFoundText = document.getElementById('iq-not-found-text');
+      notFoundText.innerHTML = isNationalId
+        ? 'لم يتم العثور على طلب مرتبط بهذا الرقم القومي.<br><span style="font-size:12px; color:var(--text-3); font-weight:500;">تأكد من صحة الرقم القومي أو تواصل مع إدارة الكلية.</span>'
+        : 'لم يتم العثور على أي طلب بهذا الاسم.<br><span style="font-size:12px; color:var(--text-3); font-weight:500;">تأكد من كتابة الاسم بشكل صحيح أو جرّب الاستعلام بالرقم القومي.</span>';
       document.getElementById('iq-not-found').classList.add('visible');
     }
   } catch (err) {
@@ -879,6 +929,39 @@ async function checkStatus() {
     document.getElementById('iq-btn-spinner').style.display = 'none';
     btn.disabled = false;
   }
+}
+
+// عرض نتائج متعددة عند البحث بالاسم (أكثر من طلب مطابق)
+function renderMultipleResults(apps) {
+  const listEl  = document.getElementById('iq-results-list');
+  const hintEl  = document.getElementById('iq-results-hint');
+  const itemsEl = document.getElementById('iq-results-items');
+
+  hintEl.textContent = `تم العثور على ${apps.length} طلب مطابق — اختر الطلب المطلوب لعرض التفاصيل:`;
+
+  itemsEl.innerHTML = apps.map((app, idx) => {
+    const nid = String(app['الرقم القومي'] || '');
+    const maskedNid = nid.length >= 4 ? '••••••••••' + nid.slice(-4) : nid;
+    return `
+      <div class="iq-result-item" onclick="selectSearchResult(${idx})">
+        <div>
+          <div class="iq-result-item-name">${app['الاسم الرباعي'] || '—'}</div>
+          <div class="iq-result-item-sub">${app['القسم'] || ''}${app['القسم'] ? ' · ' : ''}${maskedNid}</div>
+        </div>
+        <div class="iq-result-item-arrow">◀</div>
+      </div>`;
+  }).join('');
+
+  window._iqSearchResults = apps;
+  listEl.classList.add('visible');
+}
+
+function selectSearchResult(idx) {
+  const apps = window._iqSearchResults || [];
+  const app = apps[idx];
+  if (!app) return;
+  document.getElementById('iq-results-list').classList.remove('visible');
+  renderInquiryResult(app);
 }
 
 function renderInquiryResult(app) {
