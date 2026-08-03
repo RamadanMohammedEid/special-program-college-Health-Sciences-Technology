@@ -695,7 +695,7 @@
       <div class="iq-icon">🔍</div>
       <div>
         <div>الاستعلام عن حالة الطلب</div>
-        <div style="font-size:11px; font-weight:500; color:var(--text-3); margin-top:1px;"> تحقق من حالة طلبك برقمك القومي او الاسم</div>
+        <div style="font-size:11px; font-weight:500; color:var(--text-3); margin-top:1px;">سيتم فتح الاستعلام قريباً</div>
       </div>
       <span class="iq-arrow">▼</span>
     </button>
@@ -844,7 +844,18 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // Status Inquiry
 // ============================================================
+// ⚙️ قفل خانة الاستعلام مؤقتاً — لإعادة تفعيلها اجعل القيمة true
+const INQUIRY_ENABLED = false;
+
 function toggleInquiry() {
+  if (!INQUIRY_ENABLED) {
+    showDialog({
+      type: 'warning',
+      title: 'الاستعلام غير متاح حالياً',
+      message: 'سيتم فتح خانة الاستعلام عن حالة الطلب <strong>قريباً</strong>. يرجى المحاولة لاحقاً.'
+    });
+    return;
+  }
   const btn   = document.getElementById('inquiry-toggle-btn');
   const panel = document.getElementById('inquiry-panel');
   const isOpen = panel.classList.contains('open');
@@ -868,6 +879,14 @@ function normalizePercentage(val) {
 }
 
 async function checkStatus() {
+  if (!INQUIRY_ENABLED) {
+    showDialog({
+      type: 'warning',
+      title: 'الاستعلام غير متاح حالياً',
+      message: 'سيتم فتح خانة الاستعلام عن حالة الطلب <strong>قريباً</strong>. يرجى المحاولة لاحقاً.'
+    });
+    return;
+  }
   const nidEl = document.getElementById('iq-national-id');
   const query = nidEl.value.trim();
 
