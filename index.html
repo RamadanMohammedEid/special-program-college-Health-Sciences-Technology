@@ -695,7 +695,7 @@
       <div class="iq-icon">🔍</div>
       <div>
         <div>الاستعلام عن حالة الطلب</div>
-        <div style="font-size:11px; font-weight:500; color:var(--text-3); margin-top:1px;">سيتم فتح الاستعلام قريباً</div>
+        <div style="font-size:11px; font-weight:500; color:var(--text-3); margin-top:1px;"> تحقق من حالة طلبك برقمك القومي او الاسم</div>
       </div>
       <span class="iq-arrow">▼</span>
     </button>
@@ -746,9 +746,9 @@
         تم غلق باب التقدم <span class="accent-word">الإلكتروني</span>
       </h1>
       <p class="closed-sub">
-        وصلت الكلية لعدد كبير من الطلبات، ونود إعلام جميع المتقدمين أن استقبال
-        الطلبات الجديدة قد <strong>توقف الآن</strong>، وجاري العمل حالياً على
-        <strong>مراجعة البيانات</strong> المُقدَّمة بدقة تامة.
+        على الطلاب المتقدمين لشعبة المختبرات برنامج خاص الاستعلام عن حالة القبول
+        <strong>.....</strong>، وجاري العمل حالياً على
+        <strong>مراجعة البيانات</strong> وجاري مراجعة باقى الاقسام
       </p>
 
       <div class="closed-divider"></div>
@@ -844,18 +844,7 @@ document.addEventListener('keydown', e => {
 // ============================================================
 // Status Inquiry
 // ============================================================
-// ⚙️ قفل خانة الاستعلام مؤقتاً — لإعادة تفعيلها اجعل القيمة true
-const INQUIRY_ENABLED = false;
-
 function toggleInquiry() {
-  if (!INQUIRY_ENABLED) {
-    showDialog({
-      type: 'warning',
-      title: 'الاستعلام غير متاح حالياً',
-      message: 'سيتم فتح خانة الاستعلام عن حالة الطلب <strong>قريباً</strong>. يرجى المحاولة لاحقاً.'
-    });
-    return;
-  }
   const btn   = document.getElementById('inquiry-toggle-btn');
   const panel = document.getElementById('inquiry-panel');
   const isOpen = panel.classList.contains('open');
@@ -879,14 +868,6 @@ function normalizePercentage(val) {
 }
 
 async function checkStatus() {
-  if (!INQUIRY_ENABLED) {
-    showDialog({
-      type: 'warning',
-      title: 'الاستعلام غير متاح حالياً',
-      message: 'سيتم فتح خانة الاستعلام عن حالة الطلب <strong>قريباً</strong>. يرجى المحاولة لاحقاً.'
-    });
-    return;
-  }
   const nidEl = document.getElementById('iq-national-id');
   const query = nidEl.value.trim();
 
