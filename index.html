@@ -8,8 +8,342 @@
 <!-- ========================================================
      ⚙️ CONFIG - غيّر هذا الرابط برابط Web App الخاص بك
      ======================================================== -->
-<script>
-  const API_URL = 'https://script.google.com/macros/s/AKfycbzp-lHSuSIO2ErwjWt76JIB2oURHD2YCn0TfeTe0VcW09IBXvLMeq_6lxtASGmx5lpa/exec';
+<!-- API_URL لم يعد مستخدماً في هذه الصفحة (كانت للبحث القديم)، الاستعلام بقى عن طريق Firebase تحت -->
+<script type="module">
+// ============================================================
+// Firebase (Realtime Database) Data Layer
+// كلية تكنولوجيا العلوم الصحية التطبيقية - بني سويف
+// بيحل محل الـ Google Apps Script backend لتخزين بيانات الطلبات
+// (الصور بتفضل بترفع على Google Drive زي ما هي، عن طريق نفس الـ API_URL)
+// ============================================================
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-app.js";
+import {
+  getDatabase, ref, set, get, update, remove, push, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/12.17.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCVY_GGd6RZiIuifz3zabqDQL6vLh2IxhE",
+  authDomain: "student-affairs-benisuef.firebaseapp.com",
+  databaseURL: "https://student-affairs-benisuef-default-rtdb.firebaseio.com",
+  projectId: "student-affairs-benisuef",
+  storageBucket: "student-affairs-benisuef.firebasestorage.app",
+  messagingSenderId: "245590171981",
+  appId: "1:245590171981:web:8d1c3bd7cb30c075099704"
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getDatabase(app);
+
+const NODE_APPS = 'applications';
+const NODE_LOGS = 'logs';
+
+// ── Helpers ──────────────────────────────────────────────────
+function genId() {
+  return 'APP-' + new Date().getFullYear() + '-' + String(Date.now()).slice(-6);
+}
+
+// Realtime Database keys can't contain . # $ [ ] / — نستخدم الـ appId نفسه كمفتاح
+// وهو بالفعل بالصيغة APP-YYYY-XXXXXX فمفيش مشكلة.
+
+function calcAgeAndBirth(nationalId) {
+  const century    = nationalId.charAt(0) === '2' ? 1900 : 2000;
+  const birthYear  = century + parseInt(nationalId.substring(1, 3));
+  const birthMonth = parseInt(nationalId.substring(3, 5));
+  const birthDay   = parseInt(nationalId.substring(5, 7));
+  const today = new Date();
+  const age = today.getFullYear() - birthYear -
+    (today.getMonth() + 1 < birthMonth || (today.getMonth() + 1 === birthMonth && today.getDate() < birthDay) ? 1 : 0);
+  return { age, birthStr: `${birthDay}/${birthMonth}/${birthYear}` };
+}
+
+async function logAction(action, id, detail) {
+  try {
+    await push(ref(db, NODE_LOGS), {
+      date: new Date().toLocaleString('ar-EG'),
+      action, id, detail,
+      ts: serverTimestamp()
+    });
+  } catch (e) { /* silent fail */ }
+}
+
+function validateApplication(data) {
+  const reasons = [];
+  const today = new Date();
+
+  if (data.nationalId && data.nationalId.length === 14) {
+    const { age } = calcAgeAndBirth(data.nationalId);
+    if (age > 30) {
+      reasons.push(`❌ تجاوز حد السن المقرر: عمرك ${age} سنة والحد الأقصى المسموح به 30 سنة.`);
+    }
+  }
+
+  if (data.graduationYear) {
+    const yearsSince = today.getFullYear() - parseInt(data.graduationYear);
+    if (yearsSince > 10) {
+      reasons.push(`❌ تجاوز الحد الزمني للتخرج: مر على تخرجك ${yearsSince} سنوات والحد الأقصى المسموح به 10 سنوات.`);
+    }
+  }
+
+  const acceptableGrades = ['جيد جداً', 'ممتاز', 'امتياز مع مرتبة الشرف'];
+  if (data.grade && !acceptableGrades.includes(data.grade)) {
+    reasons.push(`❌ التقدير غير مؤهل: تقديرك "${data.grade}" والحد الأدنى المطلوب هو "جيد جداً" على الأقل.`);
+  }
+
+  return { valid: reasons.length === 0, reasons };
+}
+
+function buildRow(appId, data, age, birthStr, yearsSinceGrad, submitDate) {
+  return {
+    'ID':                          appId,
+    'تاريخ التقديم':               submitDate,
+    'الاسم الرباعي':               data.fullName,
+    'الرقم القومي':                data.nationalId,
+    'النوع':                       data.gender,
+    'تاريخ الميلاد':               birthStr,
+    'العمر':                       age,
+    'المحافظة':                    data.governorate,
+    'القسم':                       data.department,
+    'سنة التخرج':                  data.graduationYear,
+    'سنوات منذ التخرج':            yearsSinceGrad,
+    'التقدير':                     data.grade,
+    'النسبة المئوية':              data.percentage + '%',
+    'رقم التليفون':                data.phone,
+    'رقم الواتساب':                data.whatsapp,
+    'البريد الإلكتروني':           data.email,
+    'المجموع':                     data.total || '',
+    'الموقف من التجنيد':           data.gender === 'ذكر' ? (data.militaryStatus || '') : 'لا ينطبق',
+    'شهادة التخرج':                data.docs?.cert_grad    || '',
+    'بيان درجات السنة الأولى':     data.docs?.grades_year1 || '',
+    'بيان درجات السنة الثانية':    data.docs?.grades_year2 || '',
+    'موقف من التجنيد':             data.docs?.military_doc || '',
+    'صورة البطاقة الشخصية':        data.docs?.id_card      || '',
+    'شهادة الميلاد':               data.docs?.birth_cert   || '',
+    'إفادة جهة العمل':             data.docs?.work_letter  || '',
+    'الحالة':                      'قيد المراجعة',
+    'ملاحظات الإدارة':             '',
+    'سبب الرفض':                   ''
+  };
+}
+
+// ── Submit Application ──────────────────────────────────────
+async function submitApplication(data) {
+  const validation = validateApplication(data);
+  if (!validation.valid) return { success: false, rejected: true, reasons: validation.reasons };
+
+  try {
+    const { age, birthStr } = calcAgeAndBirth(data.nationalId);
+    const yearsSinceGrad = new Date().getFullYear() - parseInt(data.graduationYear);
+    const appId = genId();
+    const submitDate = new Date().toLocaleString('ar-EG');
+    const row = buildRow(appId, data, age, birthStr, yearsSinceGrad, submitDate);
+
+    await set(ref(db, `${NODE_APPS}/${appId}`), row);
+    logAction('submit', appId, data.fullName);
+
+    return { success: true, applicationId: appId, message: 'تم تقديم طلبك بنجاح', applicantName: data.fullName };
+  } catch (err) {
+    return { success: false, message: err.message || String(err) };
+  }
+}
+
+// ── Update Application (تعديل طلب مُرسَل مسبقًا) ─────────────
+async function updateApplication(data) {
+  if (!data.id) return { success: false, message: 'رقم الطلب مطلوب' };
+
+  try {
+    const nodeRef = ref(db, `${NODE_APPS}/${data.id}`);
+    const snap = await get(nodeRef);
+    if (!snap.exists()) return { success: false, message: 'لم يتم العثور على طلب بهذا الرقم' };
+
+    const current = snap.val();
+    if (current['الحالة'] === 'مقبول') {
+      return { success: false, message: 'لا يمكن تعديل هذا الطلب لأنه تم قبوله بالفعل. يرجى التواصل مع إدارة الكلية إذا كنت بحاجة لتعديل بياناتك.' };
+    }
+
+    const validation = validateApplication(data);
+    if (!validation.valid) return { success: false, rejected: true, reasons: validation.reasons };
+
+    const { age, birthStr } = calcAgeAndBirth(data.nationalId);
+    const yearsSinceGrad = new Date().getFullYear() - parseInt(data.graduationYear);
+
+    const updates = buildRow(data.id, data, age, birthStr, yearsSinceGrad, current['تاريخ التقديم']);
+    // منعيدش كتابة ID وتاريخ التقديم لأنهم زي ما هم بالفعل، بس مش هيضر لو اتكتبوا برضه
+    await update(nodeRef, updates);
+    logAction('update', data.id, `تعديل الطلب بواسطة المتقدم — ${data.fullName || ''}`);
+
+    return { success: true, applicationId: data.id, message: 'تم تحديث طلبك بنجاح، وأصبح قيد المراجعة مرة أخرى.' };
+  } catch (err) {
+    return { success: false, message: err.message || String(err) };
+  }
+}
+
+// ── Get All Applications (مع فلترة اختيارية زي القديم) ───────
+async function getApplications(params = {}) {
+  try {
+    const snap = await get(ref(db, NODE_APPS));
+    const val = snap.exists() ? snap.val() : {};
+    let applications = Object.keys(val).map(k => val[k]);
+
+    let filtered = applications;
+    if (params.status && params.status !== 'all') {
+      filtered = filtered.filter(a => a['الحالة'] === params.status);
+    }
+    if (params.department && params.department !== 'all') {
+      filtered = filtered.filter(a => a['القسم'] === params.department);
+    }
+    if (params.search) {
+      const q = String(params.search).toLowerCase();
+      filtered = filtered.filter(a =>
+        String(a['الاسم الرباعي']).toLowerCase().includes(q) ||
+        String(a['الرقم القومي']).includes(q) ||
+        String(a['ID']).toLowerCase().includes(q)
+      );
+    }
+
+    return { success: true, data: filtered, total: filtered.length };
+  } catch (err) {
+    return { success: false, message: err.message || String(err) };
+  }
+}
+
+async function getApplication(id) {
+  try {
+    const snap = await get(ref(db, `${NODE_APPS}/${id}`));
+    if (!snap.exists()) return { success: false, message: 'Application not found' };
+    return { success: true, data: snap.val() };
+  } catch (err) {
+    return { success: false, message: err.message || String(err) };
+  }
+}
+
+// ── Update Status (من لوحة التحكم) ────────────────────────────
+async function updateApplicationStatus(data) {
+  if (!data.id)     return { success: false, message: 'رقم الطلب مطلوب' };
+  if (!data.status) return { success: false, message: 'الحالة مطلوبة' };
+
+  const notesValue     = (data.notes || '').toString().trim();
+  const rejectionValue = (data.rejectionReason || '').toString().trim();
+
+  if (data.status === 'مرفوض' && !rejectionValue) {
+    return { success: false, message: 'من فضلك اكتب سبب الرفض قبل حفظ حالة الرفض' };
+  }
+
+  try {
+    const nodeRef = ref(db, `${NODE_APPS}/${data.id}`);
+    const snap = await get(nodeRef);
+    if (!snap.exists()) return { success: false, message: 'Application not found' };
+
+    await update(nodeRef, {
+      'ملاحظات الإدارة': notesValue,
+      'سبب الرفض':       data.status === 'مرفوض' ? rejectionValue : '',
+      'الحالة':          data.status
+    });
+
+    logAction('status_update', data.id, data.status);
+    return { success: true, message: 'تم تحديث الحالة بنجاح' };
+  } catch (err) {
+    return { success: false, message: err.message || String(err) };
+  }
+}
+
+// ── Delete Application ────────────────────────────────────────
+async function deleteApplication(id) {
+  try {
+    await remove(ref(db, `${NODE_APPS}/${id}`));
+    logAction('delete', id, '');
+    return { success: true };
+  } catch (err) {
+    return { success: false, message: err.message || String(err) };
+  }
+}
+
+// ── Admin edit (تعديل بيانات الطلب مباشرة من لوحة الإدارة) ────
+// عكس updateApplication، دي مباشرة بتحدّث الحقول اللي اتبعتت بس،
+// ومن غير ما تعيد التحقق (validation) أو تغيّر حالة الطلب.
+async function updateApplicationFields(id, patch) {
+  if (!id) return { success: false, message: 'رقم الطلب مطلوب' };
+  try {
+    const nodeRef = ref(db, `${NODE_APPS}/${id}`);
+    const snap = await get(nodeRef);
+    if (!snap.exists()) return { success: false, message: 'Application not found' };
+
+    await update(nodeRef, patch);
+    logAction('admin_edit', id, 'تعديل بيانات الطلب بواسطة الإدارة');
+    return { success: true, message: 'تم تحديث بيانات الطلب بنجاح' };
+  } catch (err) {
+    return { success: false, message: err.message || String(err) };
+  }
+}
+
+// ── Stats ────────────────────────────────────────────────────
+async function getStats() {
+  try {
+    const snap = await get(ref(db, NODE_APPS));
+    const val = snap.exists() ? snap.val() : {};
+    const applications = Object.keys(val).map(k => val[k]);
+
+    if (applications.length === 0) return { success: true, stats: { total: 0 } };
+
+    const stats = {
+      total: applications.length,
+      pending: 0, accepted: 0, rejected: 0, waiting: 0,
+      byDepartment: {},
+      byGender: { ذكر: 0, أنثى: 0 }
+    };
+
+    applications.forEach(a => {
+      const status = a['الحالة'], dept = a['القسم'], gender = a['النوع'];
+      if (status === 'قيد المراجعة') stats.pending++;
+      else if (status === 'مقبول') stats.accepted++;
+      else if (status === 'مرفوض') stats.rejected++;
+      else if (status === 'بانتظار المستندات') stats.waiting++;
+
+      stats.byDepartment[dept] = (stats.byDepartment[dept] || 0) + 1;
+      if (gender) stats.byGender[gender] = (stats.byGender[gender] || 0) + 1;
+    });
+
+    return { success: true, stats };
+  } catch (err) {
+    return { success: false, message: err.message || String(err) };
+  }
+}
+
+// ── Departments (ثابتة زي ما كانت) ─────────────────────────────
+function getDepartments() {
+  return {
+    success: true,
+    departments: [
+      'قسم الأشعة', 'قسم المختبرات', 'قسم صحة المجتمع', 'قسم الإدارة',
+      'قسم التنفس الصناعي', 'قسم البصريات', 'قسم الأجهزة الطبية',
+      'قسم تركيبات الأسنان', 'أقسام أخرى'
+    ]
+  };
+}
+
+// ── WhatsApp send log ──────────────────────────────────────────
+async function sendWhatsAppLog(data) {
+  await logAction('whatsapp_send', data.id, `إرسال رسالة إلى ${data.phone} - الحالة: ${data.status}`);
+  return { success: true };
+}
+
+// ملاحظة: رفع الملفات (uploadFile) لسه بيتم عن طريق Google Apps Script + Drive
+// زي ما هو، ومفيهوش أي تغيير هنا.
+
+window.FirebaseAPI = {
+  submitApplication,
+  updateApplication,
+  getApplications,
+  getApplication,
+  updateApplicationStatus,
+  deleteApplication,
+  updateApplicationFields,
+  getStats,
+  getDepartments,
+  sendWhatsAppLog
+};
+
+// نبعت إشارة إن الـ API بقى جاهز، لأي كود بيستنى قبل ما يشتغل
+window.dispatchEvent(new Event('firebase-api-ready'));
 </script>
 
 <style>
@@ -484,35 +818,26 @@
   .iq-not-found.visible { display: block; animation: fadeIn .3s ease; }
   .iq-not-found p { font-size: 14px; color: var(--text-2); font-weight: 600; margin-top: 8px; }
 
-  /* ── Multiple name-search results ─────────────────────── */
-  .iq-results-list {
+  .iq-multi-results {
     margin-top: 20px;
+    background: var(--surface-2);
     border: 1.5px solid var(--border);
     border-radius: var(--radius);
-    overflow: hidden;
+    padding: 18px;
     display: none;
   }
-  .iq-results-list.visible { display: block; animation: fadeIn .3s ease; }
-  .iq-results-hint {
-    padding: 12px 18px;
-    background: var(--surface-3);
-    font-size: 12px; font-weight: 700; color: var(--text-2);
-    border-bottom: 1.5px solid var(--border);
+  .iq-multi-results.visible { display: block; animation: fadeIn .3s ease; }
+  .iq-multi-title { font-size: 13px; color: var(--text-3); font-weight: 700; margin-bottom: 12px; }
+  .iq-multi-item {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    width: 100%; text-align: right; cursor: pointer;
+    background: var(--surface); border: 1.5px solid var(--border); border-radius: 10px;
+    padding: 12px 16px; margin-bottom: 8px; font-family: inherit;
+    transition: border-color .15s ease, transform .15s ease;
   }
-  .iq-result-item {
-    display: flex; align-items: center; justify-content: space-between;
-    gap: 12px;
-    padding: 14px 18px;
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    cursor: pointer;
-    transition: background .15s;
-  }
-  .iq-result-item:last-child { border-bottom: none; }
-  .iq-result-item:hover { background: var(--primary-xlt); }
-  .iq-result-item-name { font-size: 14px; font-weight: 700; color: var(--text-1); }
-  .iq-result-item-sub { font-size: 12px; font-weight: 600; color: var(--text-3); margin-top: 2px; }
-  .iq-result-item-arrow { font-size: 14px; color: var(--primary); }
+  .iq-multi-item:hover { border-color: var(--primary); transform: translateY(-1px); }
+  .iq-multi-item-name { font-size: 14px; font-weight: 700; color: var(--text-1); }
+  .iq-multi-item-sub  { font-size: 12px; color: var(--text-3); font-weight: 600; margin-top: 2px; }
 
   /* ── Beautiful Dialog Box ──────────────────────────────── */
   .dialog-overlay {
@@ -695,15 +1020,15 @@
       <div class="iq-icon">🔍</div>
       <div>
         <div>الاستعلام عن حالة الطلب</div>
-        <div style="font-size:11px; font-weight:500; color:var(--text-3); margin-top:1px;"> تحقق من حالة طلبك برقمك القومي او الاسم</div>
+        <div style="font-size:11px; font-weight:500; color:var(--text-3); margin-top:1px;">تحقق من حالة طلبك برقمك القومي</div>
       </div>
       <span class="iq-arrow">▼</span>
     </button>
     <div class="inquiry-panel" id="inquiry-panel">
       <div class="inquiry-input-row">
         <div class="field">
-          <label>الرقم القومي أو الاسم <span class="req">*</span> <span class="hint">(14 رقم، أو اسم الطالب)</span></label>
-          <input type="text" id="iq-national-id" placeholder="أدخل الرقم القومي (14 رقم) أو اسم الطالب"
+          <label>الرقم القومي أو الاسم <span class="req">*</span></label>
+          <input type="text" id="iq-national-id" placeholder="أدخل الرقم القومي (14 رقم) أو الاسم بالكامل" dir="auto"
             onkeydown="if(event.key==='Enter') checkStatus()">
         </div>
         <button class="btn btn-primary" onclick="checkStatus()" id="iq-btn" style="padding:11px 24px; white-space:nowrap;">
@@ -719,17 +1044,17 @@
         <div id="iq-notes-wrap" style="padding:0 20px 18px;"></div>
       </div>
 
-      <!-- Multiple matches by name -->
-      <div class="iq-results-list" id="iq-results-list">
-        <div class="iq-results-hint" id="iq-results-hint"></div>
-        <div id="iq-results-items"></div>
+      <!-- Multiple matches (بحث بالاسم) -->
+      <div class="iq-multi-results" id="iq-multi-results">
+        <div class="iq-multi-title">تم العثور على أكثر من نتيجة، اختر الطلب المطلوب:</div>
+        <div id="iq-multi-list"></div>
       </div>
 
       <!-- Not found -->
       <div class="iq-not-found" id="iq-not-found">
         <div style="font-size:36px;">🔎</div>
-        <p id="iq-not-found-text">لم يتم العثور على طلب مرتبط بهذا الرقم القومي.<br>
-          <span style="font-size:12px; color:var(--text-3); font-weight:500;">تأكد من صحة الرقم القومي أو تواصل مع إدارة الكلية.</span>
+        <p>لم يتم العثور على طلب مطابق.<br>
+          <span style="font-size:12px; color:var(--text-3); font-weight:500;">تأكد من صحة الرقم القومي أو الاسم، أو تواصل مع إدارة الكلية.</span>
         </p>
       </div>
     </div>
@@ -746,9 +1071,9 @@
         تم غلق باب التقدم <span class="accent-word">الإلكتروني</span>
       </h1>
       <p class="closed-sub">
-        على الطلاب المتقدمين لشعبة المختبرات برنامج خاص الاستعلام عن حالة القبول
-        <strong>.....</strong>، وجاري العمل حالياً على
-        <strong>مراجعة البيانات</strong> وجاري مراجعة باقى الاقسام
+        وصلت الكلية لعدد كبير من الطلبات، ونود إعلام جميع المتقدمين أن استقبال
+        الطلبات الجديدة قد <strong>توقف الآن</strong>، وجاري العمل حالياً على
+        <strong>مراجعة البيانات</strong> المُقدَّمة بدقة تامة.
       </p>
 
       <div class="closed-divider"></div>
@@ -872,14 +1197,12 @@ async function checkStatus() {
   const query = nidEl.value.trim();
 
   const isNationalId = /^\d{14}$/.test(query);
-  const isNameQuery  = !isNationalId && query.replace(/\s/g, '').length >= 3;
-
-  if (!isNationalId && !isNameQuery) {
+  if (!isNationalId && query.length < 3) {
     nidEl.classList.add('error');
     showDialog({
       type: 'warning',
-      title: 'بيانات البحث غير كافية',
-      message: 'يرجى إدخال الرقم القومي كاملاً المكوّن من <strong>14 رقماً</strong>، أو اسم الطالب (3 أحرف على الأقل) للاستعلام عن حالة الطلب.'
+      title: 'بيانات بحث غير كافية',
+      message: 'يرجى إدخال الرقم القومي كاملاً (<strong>14 رقماً</strong>) أو اسم لا يقل عن 3 أحرف للاستعلام عن حالة الطلب.'
     });
     nidEl.focus();
     return;
@@ -889,7 +1212,7 @@ async function checkStatus() {
   // Hide prev results
   document.getElementById('iq-result').classList.remove('visible');
   document.getElementById('iq-not-found').classList.remove('visible');
-  document.getElementById('iq-results-list').classList.remove('visible');
+  document.getElementById('iq-multi-results').classList.remove('visible');
 
   // Loading state
   const btn = document.getElementById('iq-btn');
@@ -898,24 +1221,19 @@ async function checkStatus() {
   btn.disabled = true;
 
   try {
-    const res  = await fetch(`${API_URL}?action=getApplications&search=${encodeURIComponent(query)}`);
-    const json = await res.json();
+    const json = await window.FirebaseAPI.getApplications({ search: query });
 
     if (json.success && json.data && json.data.length > 0) {
       if (isNationalId) {
-        // Find exact match by national ID
+        // رقم قومي: تطابق دقيق
         const app = json.data.find(a => String(a['الرقم القومي']).trim() === query) || json.data[0];
         renderInquiryResult(app);
       } else if (json.data.length === 1) {
         renderInquiryResult(json.data[0]);
       } else {
-        renderMultipleResults(json.data);
+        renderInquiryMultiResults(json.data);
       }
     } else {
-      const notFoundText = document.getElementById('iq-not-found-text');
-      notFoundText.innerHTML = isNationalId
-        ? 'لم يتم العثور على طلب مرتبط بهذا الرقم القومي.<br><span style="font-size:12px; color:var(--text-3); font-weight:500;">تأكد من صحة الرقم القومي أو تواصل مع إدارة الكلية.</span>'
-        : 'لم يتم العثور على أي طلب بهذا الاسم.<br><span style="font-size:12px; color:var(--text-3); font-weight:500;">تأكد من كتابة الاسم بشكل صحيح أو جرّب الاستعلام بالرقم القومي.</span>';
       document.getElementById('iq-not-found').classList.add('visible');
     }
   } catch (err) {
@@ -931,37 +1249,29 @@ async function checkStatus() {
   }
 }
 
-// عرض نتائج متعددة عند البحث بالاسم (أكثر من طلب مطابق)
-function renderMultipleResults(apps) {
-  const listEl  = document.getElementById('iq-results-list');
-  const hintEl  = document.getElementById('iq-results-hint');
-  const itemsEl = document.getElementById('iq-results-items');
-
-  hintEl.textContent = `تم العثور على ${apps.length} طلب مطابق — اختر الطلب المطلوب لعرض التفاصيل:`;
-
-  itemsEl.innerHTML = apps.map((app, idx) => {
+// يعرض قائمة نتائج عند البحث بالاسم ووجود أكثر من طلب مطابق
+function renderInquiryMultiResults(apps) {
+  const list = document.getElementById('iq-multi-list');
+  list.innerHTML = apps.map((app, i) => {
     const nid = String(app['الرقم القومي'] || '');
-    const maskedNid = nid.length >= 4 ? '••••••••••' + nid.slice(-4) : nid;
+    const maskedNid = nid ? nid.slice(0, 6) + '••••••••' : '—';
     return `
-      <div class="iq-result-item" onclick="selectSearchResult(${idx})">
+      <button type="button" class="iq-multi-item" onclick="selectInquiryResult(${i})">
         <div>
-          <div class="iq-result-item-name">${app['الاسم الرباعي'] || '—'}</div>
-          <div class="iq-result-item-sub">${app['القسم'] || ''}${app['القسم'] ? ' · ' : ''}${maskedNid}</div>
+          <div class="iq-multi-item-name">${app['الاسم الرباعي'] || '—'}</div>
+          <div class="iq-multi-item-sub">${maskedNid} — ${app['القسم'] || ''}</div>
         </div>
-        <div class="iq-result-item-arrow">◀</div>
-      </div>`;
+        <div class="iq-multi-item-sub">${app['الحالة'] || ''}</div>
+      </button>`;
   }).join('');
-
-  window._iqSearchResults = apps;
-  listEl.classList.add('visible');
+  window.__iqMultiResults = apps;
+  document.getElementById('iq-multi-results').classList.add('visible');
 }
 
-function selectSearchResult(idx) {
-  const apps = window._iqSearchResults || [];
-  const app = apps[idx];
-  if (!app) return;
-  document.getElementById('iq-results-list').classList.remove('visible');
-  renderInquiryResult(app);
+function selectInquiryResult(index) {
+  document.getElementById('iq-multi-results').classList.remove('visible');
+  const app = (window.__iqMultiResults || [])[index];
+  if (app) renderInquiryResult(app);
 }
 
 function renderInquiryResult(app) {
