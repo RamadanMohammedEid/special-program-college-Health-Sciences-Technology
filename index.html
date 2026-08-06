@@ -18,23 +18,25 @@
 // ============================================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-app.js";
 import {
-  getDatabase, ref, set, get, update, remove, push, serverTimestamp
+  getDatabase, ref, set, get, update, remove, push, serverTimestamp,
+  query, orderByChild, equalTo, startAt, endAt, limitToFirst
 } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-database.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCVY_GGd6RZiIuifz3zabqDQL6vLh2IxhE",
-  authDomain: "student-affairs-benisuef.firebaseapp.com",
-  databaseURL: "https://student-affairs-benisuef-default-rtdb.firebaseio.com",
-  projectId: "student-affairs-benisuef",
-  storageBucket: "student-affairs-benisuef.firebasestorage.app",
-  messagingSenderId: "245590171981",
-  appId: "1:245590171981:web:8d1c3bd7cb30c075099704"
+  apiKey: "AIzaSyDGHva551IUVzSkFmANmqNqtr61lZ0fCQg",
+  authDomain: "students-website-9f059.firebaseapp.com",
+  databaseURL: "https://students-website-9f059-default-rtdb.firebaseio.com",
+  projectId: "students-website-9f059",
+  storageBucket: "students-website-9f059.firebasestorage.app",
+  messagingSenderId: "705475848216",
+  appId: "1:705475848216:web:64c52c49d93f352e203b6d"
 };
 
 const app = initializeApp(firebaseConfig);
 const db  = getDatabase(app);
 
 const NODE_APPS = 'applications';
+const NODE_LIST = 'appList'; // ⚡ نسخة خفيفة من كل طلب، من غير روابط المستندات — بيحدّثها لوحة الإدارة تلقائياً
 const NODE_LOGS = 'logs';
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -178,9 +180,43 @@ async function updateApplication(data) {
 }
 
 // ── Get All Applications (مع فلترة اختيارية زي القديم) ───────
+// ⚡ تحسين استهلاك الداتابيز (خطوتين):
+// 1) بنقرا من appList (نسخة خفيفة بيحدّثها لوحة الإدارة تلقائياً، من غير روابط
+//    المستندات السبعة اللي صفحة الاستعلام العامة أصلاً مش بتستخدمها) بدل applications الكاملة.
+// 2) بنستخدم queries مفهرسة (indexed) بتجيب بس السجلات المطابقة فعلاً بدل الجدول كله.
+// ملحوظة: 'الرقم القومي' غالباً متفهرس بالفعل في appList (الإدارة بتستخدمه كده).
+// لو 'الاسم الرباعي' مش متفهرس هتحتاج تضيفه في Rules (شوف التعليمات).
 async function getApplications(params = {}) {
   try {
-    const snap = await get(ref(db, NODE_APPS));
+    // 1) بحث بالرقم القومي كامل (14 رقم) → مطابقة دقيقة، بيجيب سجل واحد بس مش الجدول كله
+    if (params.search && /^\d{14}$/.test(String(params.search).trim())) {
+      const q = query(ref(db, NODE_LIST), orderByChild('الرقم القومي'), equalTo(String(params.search).trim()), limitToFirst(1));
+      const snap = await get(q);
+      const val = snap.exists() ? snap.val() : {};
+      const applications = Object.keys(val).map(k => val[k]);
+      return { success: true, data: applications, total: applications.length };
+    }
+
+    // 2) بحث بالاسم (3 أحرف فأكثر) → مطابقة "يبدأ بـ" مش "يحتوي على"
+    // (RTDB مش بيدعم full-text search، فالحل الوحيد اللي بيوفر باندويدث هو range query
+    // على أول الاسم. الاسم الرباعي عادةً بيتكتب بالاسم الأول الأول، فده بيغطي أغلب الحالات.)
+    if (params.search && !(params.status && params.status !== 'all') && !(params.department && params.department !== 'all')) {
+      const term = String(params.search).trim();
+      const q = query(
+        ref(db, NODE_LIST),
+        orderByChild('الاسم الرباعي'),
+        startAt(term),
+        endAt(term + '\uf8ff'),
+        limitToFirst(20)
+      );
+      const snap = await get(q);
+      const val = snap.exists() ? snap.val() : {};
+      const applications = Object.keys(val).map(k => val[k]);
+      return { success: true, data: applications, total: applications.length };
+    }
+
+    // 3) أي حالة تانية (فلترة بالحالة/القسم) → سلوك احتياطي قديم، نادر الاستخدام في الصفحة العامة
+    const snap = await get(ref(db, NODE_LIST));
     const val = snap.exists() ? snap.val() : {};
     let applications = Object.keys(val).map(k => val[k]);
 
@@ -1192,6 +1228,34 @@ function normalizePercentage(val) {
   return String(num);
 }
 
+// ============================================================
+// ⚡ Cache للاستعلامات (sessionStorage) — لتقليل استهلاك القراءة
+// ============================================================
+// أي استعلام بنفس القيمة (رقم قومي/اسم) بيتخزن محلياً لمدة CACHE_TTL،
+// فلو الطالب دوّس على زرار الاستعلام أكتر من مرة، أو رجع لنفس الصفحة تاني
+// في نفس الجلسة، أو استخدم زرار "رجوع" في المتصفح، مفيش طلب جديد لـ Firebase.
+const IQ_CACHE_PREFIX = 'iq_cache_';
+const IQ_CACHE_TTL_MS = 5 * 60 * 1000; // 5 دقايق — كفاية لمنع التكرار، وقليلة كفاية عشان لو الإدارة غيّرت حالة الطلب الطالب يشوفها بسرعة معقولة
+
+function getCachedInquiry(key) {
+  try {
+    const raw = sessionStorage.getItem(IQ_CACHE_PREFIX + key);
+    if (!raw) return null;
+    const entry = JSON.parse(raw);
+    if (Date.now() - entry.t > IQ_CACHE_TTL_MS) {
+      sessionStorage.removeItem(IQ_CACHE_PREFIX + key);
+      return null;
+    }
+    return entry.v;
+  } catch { return null; }
+}
+
+function setCachedInquiry(key, value) {
+  try {
+    sessionStorage.setItem(IQ_CACHE_PREFIX + key, JSON.stringify({ t: Date.now(), v: value }));
+  } catch { /* sessionStorage ممتلئ أو مش متاح — تجاهل بهدوء */ }
+}
+
 async function checkStatus() {
   const nidEl = document.getElementById('iq-national-id');
   const query = nidEl.value.trim();
@@ -1221,7 +1285,12 @@ async function checkStatus() {
   btn.disabled = true;
 
   try {
-    const json = await window.FirebaseAPI.getApplications({ search: query });
+    const cacheKey = query;
+    let json = getCachedInquiry(cacheKey);
+    if (!json) {
+      json = await window.FirebaseAPI.getApplications({ search: query });
+      setCachedInquiry(cacheKey, json);
+    }
 
     if (json.success && json.data && json.data.length > 0) {
       if (isNationalId) {
