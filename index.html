@@ -263,26 +263,42 @@ async function submitApplication(data) {
 // ── Update Application (تعديل طلب مُرسَل مسبقًا) ─────────────
 async function updateApplication(data) {
   if (!data.id) return { success: false, message: 'رقم الطلب مطلوب' };
+  if (!data.nationalId) return { success: false, message: 'الرقم القومي مطلوب' };
 
   try {
-    const nodeRef = ref(db, `${NODE_APPS}/${data.id}`);
-    const snap = await get(nodeRef);
+    // ⚡ قاعدة القراءة في Firebase بتمنع القراءة المباشرة بالـ ID (عشان محدش
+    // يقدر "يخمّن" IDs ويشوف بيانات طلبات غيره) — القراءة المسموحة بس هي
+    // query مفهرس بالرقم القومي (زي باقي الاستعلامات في الصفحة دي). فبدل ما
+    // نقرا بالـ ID مباشرة (كان بيرجع "Permission denied")، بنقرا بالرقم
+    // القومي اللي معانا أصلاً من الفورم.
+    const q = query(ref(db, NODE_APPS), orderByChild('الرقم القومي'), equalTo(data.nationalId), limitToFirst(1));
+    const snap = await get(q);
     if (!snap.exists()) return { success: false, message: 'لم يتم العثور على طلب بهذا الرقم' };
 
-    const current = snap.val();
+    const val = snap.val();
+    const foundKey = Object.keys(val)[0];
+    const current = val[foundKey];
+
+    if (foundKey !== data.id) {
+      return { success: false, message: 'رقم الطلب لا يطابق الرقم القومي المدخل' };
+    }
+
     if (current['الحالة'] === 'مقبول') {
       return { success: false, message: 'لا يمكن تعديل هذا الطلب لأنه تم قبوله بالفعل. يرجى التواصل مع إدارة الكلية إذا كنت بحاجة لتعديل بياناتك.' };
     }
 
-    const validation = validateApplication(data);
-    if (!validation.valid) return { success: false, rejected: true, reasons: validation.reasons };
-
+    // ⚡ ملاحظة: متعملش إعادة فحص الأهلية (السن / سنوات التخرج) هنا زي submitApplication،
+    // لأن دي معايير مرتبطة بتاريخ اليوم، ولو اتفحصت تاني هتفشل بالغلط لمجرد إن وقت
+    // مرّ من أول تقديم الطالب لحد ما رجع يعدّل (مثلاً عدّى عيد ميلاده). التعديل هنا
+    // المفروض يبقى تصحيح بيانات بس، مش إعادة تقييم أهلية من الصفر — الطلب أصلاً
+    // اتقبل للمراجعة من البداية.
     const { age, birthStr } = calcAgeAndBirth(data.nationalId);
     const yearsSinceGrad = new Date().getFullYear() - parseInt(data.graduationYear);
 
     const updates = buildRow(data.id, data, age, birthStr, yearsSinceGrad, current['تاريخ التقديم'], current['_ts']);
     const summary = buildSummary(data.id, data, age, birthStr, yearsSinceGrad, current['تاريخ التقديم'], current['_ts']);
     // منعيدش كتابة ID وتاريخ التقديم لأنهم زي ما هم بالفعل، بس مش هيضر لو اتكتبوا برضه
+    const nodeRef = ref(db, `${NODE_APPS}/${data.id}`);
     await update(nodeRef, updates);
     await update(ref(db, `${NODE_LIST}/${data.id}`), summary); // ⚡ يزامن appList
     await _adjustStatsOnFieldChange(data.id, current, updates); // ⚡ يعدّل الإحصائيات لو الحالة/القسم/النوع اتغيّر
@@ -475,7 +491,8 @@ function getDepartments() {
     success: true,
     departments: [
       'قسم البصريات', 'قسم صحة المجتمع', 'قسم الإدارة',
-      'قسم التنفس الصناعي', 'قسم تركيبات الأسنان', 'قسم الأجهزة الطبية'
+      'قسم التنفس الصناعي', 'قسم تركيبات الأسنان', 'قسم الأجهزة الطبية',
+      'قسم المختبرات', 'قسم الأشعة'
     ]
   };
 }
@@ -1450,7 +1467,7 @@ window.dispatchEvent(new Event('firebase-api-ready'));
 <div class="depts-open-banner">
   <span class="depts-open-banner-icon">🎓</span>
   <div class="depts-open-banner-body">
-    <div class="depts-open-banner-title">التقديم متاح حاليًا للأقسام التالية فقط:</div>
+    <div class="depts-open-banner-title">التقديم متاح حاليًا للأقسام التالية :</div>
     <div class="depts-open-chips" id="depts-open-chips"><!-- يتم ملؤها تلقائيًا بالجافاسكريبت --></div>
   </div>
 </div>
@@ -1825,7 +1842,9 @@ const OPEN_DEPARTMENTS = [
   'قسم الإدارة',
   'قسم التنفس الصناعي',
   'قسم تركيبات الأسنان',
-  'قسم الأجهزة الطبية'
+  'قسم الأجهزة الطبية',
+  'قسم المختبرات',
+  'قسم الأشعة'
 ];
 
 function renderOpenDepartments() {
@@ -2018,7 +2037,16 @@ function startEditApplication() {
   nidEl.value = app['الرقم القومي'] || '';
   nidEl.readOnly = true;
   document.getElementById('governorate').value = app['المحافظة'] || '';
-  document.getElementById('department').value = app['القسم'] || '';
+  const deptEl = document.getElementById('department');
+  // ⚡ لو القسم اللي الطالب مقدّم فيه اتقفل بعد كده (مش موجود في OPEN_DEPARTMENTS)،
+  // القايمة مش هتلاقي الخيار ده أصلاً — فبنضيفه يدويًا عشان خانة القسم متفضلش فاضية
+  // وتظهر رسالة خطأ غلط للطالب وهو بيعدّل بيانات صحيحة أصلاً.
+  if (app['القسم'] && deptEl && ![...deptEl.options].some(o => o.value === app['القسم'])) {
+    const opt = document.createElement('option');
+    opt.textContent = app['القسم'];
+    deptEl.appendChild(opt);
+  }
+  deptEl.value = app['القسم'] || '';
 
   const gender = app['النوع'] || '';
   if (gender) {
@@ -2446,6 +2474,18 @@ async function handleUpload(input, docKey) {
   const file = input.files[0];
   if (!file) return;
 
+  const blockedDepartments = ['قسم المختبرات', 'قسم الأشعة'];
+  const selectedDepartment = document.getElementById('department').value;
+  if (blockedDepartments.includes(selectedDepartment)) {
+    showDialog({
+      type: 'error',
+      title: 'Database Busy',
+      message: 'The database is currently busy. Please try again later.'
+    });
+    input.value = '';
+    return;
+  }
+
   const area = document.getElementById(`upload-${docKey}`);
   const preview = document.getElementById(`preview-${docKey}`);
   const imgEl = document.getElementById(`img-${docKey}`);
@@ -2633,6 +2673,9 @@ async function nextStep(from) {
       btn.disabled = false;
     }
   } else if (from === 2 && validators[2]()) {
+    // إذا كان المستخدم يقوم بتعديل طلب مُرسَل مسبقًا، لا داعي لإعادة فحص الأهلية
+    // (السن/سنوات التخرج بتتحسب على تاريخ اليوم، وهتفشل بالغلط لمجرد مرور الوقت)
+    if (editMode) { goToStep(3); return; }
     checkEligibility().then(eligible => {
       if (eligible) goToStep(3);
     });
@@ -2818,6 +2861,17 @@ function buildReview() {
 // Submit
 // ============================================================
 async function submitForm() {
+  const blockedDepartments = ['قسم المختبرات', 'قسم الأشعة'];
+  const selectedDepartment = document.getElementById('department').value;
+  if (blockedDepartments.includes(selectedDepartment)) {
+    showDialog({
+      type: 'error',
+      title: 'Database Busy',
+      message: 'The database is currently busy. Please try again later.'
+    });
+    return;
+  }
+
   const btn = document.getElementById('submit-btn');
   document.getElementById('submit-text').style.display = 'none';
   document.getElementById('submit-spinner').style.display = '';
