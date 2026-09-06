@@ -1467,7 +1467,7 @@ window.dispatchEvent(new Event('firebase-api-ready'));
 <div class="depts-open-banner">
   <span class="depts-open-banner-icon">🎓</span>
   <div class="depts-open-banner-body">
-    <div class="depts-open-banner-title">التقديم متاح حاليًا للأقسام التالية :</div>
+    <div class="depts-open-banner-title">التقديم متاح حاليًا للأقسام التالية فقط:</div>
     <div class="depts-open-chips" id="depts-open-chips"><!-- يتم ملؤها تلقائيًا بالجافاسكريبت --></div>
   </div>
 </div>
@@ -2474,18 +2474,6 @@ async function handleUpload(input, docKey) {
   const file = input.files[0];
   if (!file) return;
 
-  const blockedDepartments = ['قسم المختبرات', 'قسم الأشعة'];
-  const selectedDepartment = document.getElementById('department').value;
-  if (blockedDepartments.includes(selectedDepartment)) {
-    showDialog({
-      type: 'error',
-      title: 'Database Busy',
-      message: 'The database is currently busy. Please try again later.'
-    });
-    input.value = '';
-    return;
-  }
-
   const area = document.getElementById(`upload-${docKey}`);
   const preview = document.getElementById(`preview-${docKey}`);
   const imgEl = document.getElementById(`img-${docKey}`);
@@ -2861,17 +2849,6 @@ function buildReview() {
 // Submit
 // ============================================================
 async function submitForm() {
-  const blockedDepartments = ['قسم المختبرات', 'قسم الأشعة'];
-  const selectedDepartment = document.getElementById('department').value;
-  if (blockedDepartments.includes(selectedDepartment)) {
-    showDialog({
-      type: 'error',
-      title: 'Database Busy',
-      message: 'The database is currently busy. Please try again later.'
-    });
-    return;
-  }
-
   const btn = document.getElementById('submit-btn');
   document.getElementById('submit-text').style.display = 'none';
   document.getElementById('submit-spinner').style.display = '';
