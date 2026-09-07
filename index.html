@@ -8,10 +8,7 @@
 <!-- ========================================================
      ⚙️ CONFIG - غيّر هذا الرابط برابط Web App الخاص بك
      ======================================================== -->
-<script>
-  // API_URL بيتستخدم دلوقتي بس لرفع الملفات (الصور) على Google Drive
-  const API_URL = 'https://script.google.com/macros/s/AKfycbyNj47Irg4WzkktIS9hUyxQyHDjLkY5Urwzc9DqcfrRPGFXMUD5e5u6V_ie4j5s5XA/exec';
-</script>
+<!-- API_URL لم يعد مستخدماً في هذه الصفحة (كانت للبحث القديم)، الاستعلام بقى عن طريق Firebase تحت -->
 <script type="module">
 // ============================================================
 // Firebase (Realtime Database) Data Layer
@@ -22,7 +19,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
 import {
   getDatabase, ref, set, get, update, remove, push, serverTimestamp,
-  query, orderByChild, equalTo, startAt, endAt, limitToFirst, runTransaction
+  query, orderByChild, equalTo, startAt, endAt, limitToFirst
 } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-database.js";
 
 const firebaseConfig = {
@@ -38,10 +35,9 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db  = getDatabase(app);
 
-const NODE_APPS  = 'applications';
-const NODE_LIST  = 'appList';  // ⚡ نسخة خفيفة بيقرا منها لوحة الإدارة — لازم تتحدّث مع كل submit/update هنا
-const NODE_STATS = 'stats';    // ⚡ إحصائيات مجمّعة بتقرا منها لوحة الإدارة مباشرة من غير ما تنزل الجدول كله
-const NODE_LOGS  = 'logs';
+const NODE_APPS = 'applications';
+const NODE_LIST = 'appList'; // ⚡ نسخة خفيفة من كل طلب، من غير روابط المستندات — بيحدّثها لوحة الإدارة تلقائياً
+const NODE_LOGS = 'logs';
 
 // ── Helpers ──────────────────────────────────────────────────
 function genId() {
@@ -98,7 +94,7 @@ function validateApplication(data) {
   return { valid: reasons.length === 0, reasons };
 }
 
-function buildRow(appId, data, age, birthStr, yearsSinceGrad, submitDate, existingTs) {
+function buildRow(appId, data, age, birthStr, yearsSinceGrad, submitDate) {
   return {
     'ID':                          appId,
     'تاريخ التقديم':               submitDate,
@@ -127,97 +123,8 @@ function buildRow(appId, data, age, birthStr, yearsSinceGrad, submitDate, existi
     'إفادة جهة العمل':             data.docs?.work_letter  || '',
     'الحالة':                      'قيد المراجعة',
     'ملاحظات الإدارة':             '',
-    'سبب الرفض':                   '',
-    '_ts':                         existingTs || Date.now(),
-    '_updated':                    serverTimestamp()
+    'سبب الرفض':                   ''
   };
-}
-
-// ⚡ نسخة خفيفة من السجل من غير روابط المستندات — دي اللي بتتخزن في appList
-// وبتقرا منها لوحة الإدارة (جدول العرض الرئيسي) والصفحة العامة للاستعلام،
-// عشان محدش يحمّل روابط مستندات كل المتقدمين وهو بس عايز يشوف قائمة/إحصائية.
-function buildSummary(appId, data, age, birthStr, yearsSinceGrad, submitDate, existingTs) {
-  const row = buildRow(appId, data, age, birthStr, yearsSinceGrad, submitDate, existingTs);
-  const summary = { ...row };
-  delete summary['شهادة التخرج'];
-  delete summary['بيان درجات السنة الأولى'];
-  delete summary['بيان درجات السنة الثانية'];
-  delete summary['موقف من التجنيد'];
-  delete summary['صورة البطاقة الشخصية'];
-  delete summary['شهادة الميلاد'];
-  delete summary['إفادة جهة العمل'];
-  return summary;
-}
-
-function _statusKey(s) {
-  return s === 'قيد المراجعة' ? 'pending' : s === 'مقبول' ? 'accepted' : s === 'مرفوض' ? 'rejected' : s === 'بانتظار المستندات' ? 'waiting' : null;
-}
-
-// ⚡ بتحدّث عداد stats بمعاملة (transaction) آمنة — بتتحدث عند كل submit جديد
-async function _updateStats(data, delta) {
-  const statsRef = ref(db, NODE_STATS);
-  await runTransaction(statsRef, (stats) => {
-    if (!stats) stats = { total: 0, pending: 0, accepted: 0, rejected: 0, waiting: 0, byDepartment: {}, byGender: { ذكر: 0, أنثى: 0 } };
-    const status = data['الحالة'] || 'قيد المراجعة';
-    const dept   = data['القسم'];
-    const gender = data['النوع'];
-    const key = _statusKey(status);
-    if (key) stats[key] = (stats[key] || 0) + delta;
-    stats.total = (stats.total || 0) + delta;
-    if (dept) {
-      stats.byDepartment = stats.byDepartment || {};
-      stats.byDepartment[dept] = (stats.byDepartment[dept] || 0) + delta;
-      if (stats.byDepartment[dept] <= 0) delete stats.byDepartment[dept];
-    }
-    if (gender) {
-      stats.byGender = stats.byGender || {};
-      stats.byGender[gender] = (stats.byGender[gender] || 0) + delta;
-      if (stats.byGender[gender] <= 0) delete stats.byGender[gender];
-    }
-    return stats;
-  });
-}
-
-// ⚡ بتعدّل عدادات stats لما بيانات الطلب (حالة/قسم/نوع) تتغيّر أثناء تعديل الطالب لطلبه
-async function _adjustStatsOnFieldChange(id, oldData, newData) {
-  const oldStatus = oldData['الحالة'];
-  const newStatus = newData['الحالة'];
-  const oldDept   = oldData['القسم'];
-  const newDept   = newData['القسم'];
-  const oldGender = oldData['النوع'];
-  const newGender = newData['النوع'];
-  if (oldStatus === newStatus && oldDept === newDept && oldGender === newGender) return;
-  const statsRef = ref(db, NODE_STATS);
-  await runTransaction(statsRef, (stats) => {
-    if (!stats) stats = { total: 0, pending: 0, accepted: 0, rejected: 0, waiting: 0, byDepartment: {}, byGender: { ذكر: 0, أنثى: 0 } };
-    if (oldStatus !== newStatus) {
-      const oldKey = _statusKey(oldStatus);
-      const newKey = _statusKey(newStatus);
-      if (oldKey && stats[oldKey]) stats[oldKey]--;
-      if (newKey) stats[newKey] = (stats[newKey] || 0) + 1;
-    }
-    if (oldDept !== newDept) {
-      if (oldDept && stats.byDepartment?.[oldDept]) {
-        stats.byDepartment[oldDept]--;
-        if (stats.byDepartment[oldDept] <= 0) delete stats.byDepartment[oldDept];
-      }
-      if (newDept) {
-        stats.byDepartment = stats.byDepartment || {};
-        stats.byDepartment[newDept] = (stats.byDepartment[newDept] || 0) + 1;
-      }
-    }
-    if (oldGender !== newGender) {
-      if (oldGender && stats.byGender?.[oldGender]) {
-        stats.byGender[oldGender]--;
-        if (stats.byGender[oldGender] <= 0) delete stats.byGender[oldGender];
-      }
-      if (newGender) {
-        stats.byGender = stats.byGender || {};
-        stats.byGender[newGender] = (stats.byGender[newGender] || 0) + 1;
-      }
-    }
-    return stats;
-  });
 }
 
 // ── Submit Application ──────────────────────────────────────
@@ -226,32 +133,13 @@ async function submitApplication(data) {
   if (!validation.valid) return { success: false, rejected: true, reasons: validation.reasons };
 
   try {
-    // ⚡ منع التكرار بشكل قاطع: بيتحقق هنا مباشرة قبل الكتابة، بغض النظر
-    // عن أي فحص سابق حصل في الواجهة (اللي ممكن يتخطّى لو حصلت مشكلة اتصال
-    // مؤقتة). ده استعلام مفهرس خفيف (سجل واحد بس) فمش بيكلّف باندويدث إضافي.
-    const dupQ = query(ref(db, NODE_APPS), orderByChild('الرقم القومي'), equalTo(data.nationalId), limitToFirst(1));
-    const dupSnap = await get(dupQ);
-    if (dupSnap.exists()) {
-      const dupVal = dupSnap.val();
-      const existing = dupVal[Object.keys(dupVal)[0]];
-      return {
-        success: false,
-        duplicate: true,
-        existingApplication: existing,
-        message: 'يوجد طلب مُرسَل بالفعل بنفس الرقم القومي. يمكنك تعديل طلبك الحالي بدلاً من تقديم طلب جديد.'
-      };
-    }
-
     const { age, birthStr } = calcAgeAndBirth(data.nationalId);
     const yearsSinceGrad = new Date().getFullYear() - parseInt(data.graduationYear);
     const appId = genId();
     const submitDate = new Date().toLocaleString('ar-EG');
-    const row     = buildRow(appId, data, age, birthStr, yearsSinceGrad, submitDate);
-    const summary = buildSummary(appId, data, age, birthStr, yearsSinceGrad, submitDate);
+    const row = buildRow(appId, data, age, birthStr, yearsSinceGrad, submitDate);
 
     await set(ref(db, `${NODE_APPS}/${appId}`), row);
-    await set(ref(db, `${NODE_LIST}/${appId}`), summary); // ⚡ يظهر فوراً في لوحة الإدارة
-    await _updateStats(row, 1);                            // ⚡ يحدّث الإحصائيات
     logAction('submit', appId, data.fullName);
 
     return { success: true, applicationId: appId, message: 'تم تقديم طلبك بنجاح', applicantName: data.fullName };
@@ -263,45 +151,26 @@ async function submitApplication(data) {
 // ── Update Application (تعديل طلب مُرسَل مسبقًا) ─────────────
 async function updateApplication(data) {
   if (!data.id) return { success: false, message: 'رقم الطلب مطلوب' };
-  if (!data.nationalId) return { success: false, message: 'الرقم القومي مطلوب' };
 
   try {
-    // ⚡ قاعدة القراءة في Firebase بتمنع القراءة المباشرة بالـ ID (عشان محدش
-    // يقدر "يخمّن" IDs ويشوف بيانات طلبات غيره) — القراءة المسموحة بس هي
-    // query مفهرس بالرقم القومي (زي باقي الاستعلامات في الصفحة دي). فبدل ما
-    // نقرا بالـ ID مباشرة (كان بيرجع "Permission denied")، بنقرا بالرقم
-    // القومي اللي معانا أصلاً من الفورم.
-    const q = query(ref(db, NODE_APPS), orderByChild('الرقم القومي'), equalTo(data.nationalId), limitToFirst(1));
-    const snap = await get(q);
+    const nodeRef = ref(db, `${NODE_APPS}/${data.id}`);
+    const snap = await get(nodeRef);
     if (!snap.exists()) return { success: false, message: 'لم يتم العثور على طلب بهذا الرقم' };
 
-    const val = snap.val();
-    const foundKey = Object.keys(val)[0];
-    const current = val[foundKey];
-
-    if (foundKey !== data.id) {
-      return { success: false, message: 'رقم الطلب لا يطابق الرقم القومي المدخل' };
-    }
-
+    const current = snap.val();
     if (current['الحالة'] === 'مقبول') {
       return { success: false, message: 'لا يمكن تعديل هذا الطلب لأنه تم قبوله بالفعل. يرجى التواصل مع إدارة الكلية إذا كنت بحاجة لتعديل بياناتك.' };
     }
 
-    // ⚡ ملاحظة: متعملش إعادة فحص الأهلية (السن / سنوات التخرج) هنا زي submitApplication،
-    // لأن دي معايير مرتبطة بتاريخ اليوم، ولو اتفحصت تاني هتفشل بالغلط لمجرد إن وقت
-    // مرّ من أول تقديم الطالب لحد ما رجع يعدّل (مثلاً عدّى عيد ميلاده). التعديل هنا
-    // المفروض يبقى تصحيح بيانات بس، مش إعادة تقييم أهلية من الصفر — الطلب أصلاً
-    // اتقبل للمراجعة من البداية.
+    const validation = validateApplication(data);
+    if (!validation.valid) return { success: false, rejected: true, reasons: validation.reasons };
+
     const { age, birthStr } = calcAgeAndBirth(data.nationalId);
     const yearsSinceGrad = new Date().getFullYear() - parseInt(data.graduationYear);
 
-    const updates = buildRow(data.id, data, age, birthStr, yearsSinceGrad, current['تاريخ التقديم'], current['_ts']);
-    const summary = buildSummary(data.id, data, age, birthStr, yearsSinceGrad, current['تاريخ التقديم'], current['_ts']);
+    const updates = buildRow(data.id, data, age, birthStr, yearsSinceGrad, current['تاريخ التقديم']);
     // منعيدش كتابة ID وتاريخ التقديم لأنهم زي ما هم بالفعل، بس مش هيضر لو اتكتبوا برضه
-    const nodeRef = ref(db, `${NODE_APPS}/${data.id}`);
     await update(nodeRef, updates);
-    await update(ref(db, `${NODE_LIST}/${data.id}`), summary); // ⚡ يزامن appList
-    await _adjustStatsOnFieldChange(data.id, current, updates); // ⚡ يعدّل الإحصائيات لو الحالة/القسم/النوع اتغيّر
     logAction('update', data.id, `تعديل الطلب بواسطة المتقدم — ${data.fullName || ''}`);
 
     return { success: true, applicationId: data.id, message: 'تم تحديث طلبك بنجاح، وأصبح قيد المراجعة مرة أخرى.' };
@@ -311,16 +180,17 @@ async function updateApplication(data) {
 }
 
 // ── Get All Applications (مع فلترة اختيارية زي القديم) ───────
-// ⚡ تحسين استهلاك الداتابيز: بدل تحميل applications كاملة (بكل روابط المستندات
-// لكل المتقدمين) في كل مرة الطالب يستعلم أو يتحقق من التكرار قبل التقديم،
-// بنستخدم queries مفهرسة بترجع بس السجلات المطابقة. لازم نفضل نقرا من
-// applications (مش appList) هنا لأن صفحة "تعديل الطلب" محتاجة روابط
-// المستندات المرفوعة قبل كده، وde مش موجود في appList.
+// ⚡ تحسين استهلاك الداتابيز (خطوتين):
+// 1) بنقرا من appList (نسخة خفيفة بيحدّثها لوحة الإدارة تلقائياً، من غير روابط
+//    المستندات السبعة اللي صفحة الاستعلام العامة أصلاً مش بتستخدمها) بدل applications الكاملة.
+// 2) بنستخدم queries مفهرسة (indexed) بتجيب بس السجلات المطابقة فعلاً بدل الجدول كله.
+// ملحوظة: 'الرقم القومي' غالباً متفهرس بالفعل في appList (الإدارة بتستخدمه كده).
+// لو 'الاسم الرباعي' مش متفهرس هتحتاج تضيفه في Rules (شوف التعليمات).
 async function getApplications(params = {}) {
   try {
     // 1) بحث بالرقم القومي كامل (14 رقم) → مطابقة دقيقة، بيجيب سجل واحد بس مش الجدول كله
     if (params.search && /^\d{14}$/.test(String(params.search).trim())) {
-      const q = query(ref(db, NODE_APPS), orderByChild('الرقم القومي'), equalTo(String(params.search).trim()), limitToFirst(1));
+      const q = query(ref(db, NODE_LIST), orderByChild('الرقم القومي'), equalTo(String(params.search).trim()), limitToFirst(1));
       const snap = await get(q);
       const val = snap.exists() ? snap.val() : {};
       const applications = Object.keys(val).map(k => val[k]);
@@ -328,10 +198,12 @@ async function getApplications(params = {}) {
     }
 
     // 2) بحث بالاسم (3 أحرف فأكثر) → مطابقة "يبدأ بـ" مش "يحتوي على"
+    // (RTDB مش بيدعم full-text search، فالحل الوحيد اللي بيوفر باندويدث هو range query
+    // على أول الاسم. الاسم الرباعي عادةً بيتكتب بالاسم الأول الأول، فده بيغطي أغلب الحالات.)
     if (params.search && !(params.status && params.status !== 'all') && !(params.department && params.department !== 'all')) {
       const term = String(params.search).trim();
       const q = query(
-        ref(db, NODE_APPS),
+        ref(db, NODE_LIST),
         orderByChild('الاسم الرباعي'),
         startAt(term),
         endAt(term + '\uf8ff'),
@@ -343,8 +215,8 @@ async function getApplications(params = {}) {
       return { success: true, data: applications, total: applications.length };
     }
 
-    // 3) أي حالة تانية → سلوك احتياطي قديم، نادر الاستخدام في الصفحة دي
-    const snap = await get(ref(db, NODE_APPS));
+    // 3) أي حالة تانية (فلترة بالحالة/القسم) → سلوك احتياطي قديم، نادر الاستخدام في الصفحة العامة
+    const snap = await get(ref(db, NODE_LIST));
     const val = snap.exists() ? snap.val() : {};
     let applications = Object.keys(val).map(k => val[k]);
 
@@ -396,17 +268,12 @@ async function updateApplicationStatus(data) {
     const nodeRef = ref(db, `${NODE_APPS}/${data.id}`);
     const snap = await get(nodeRef);
     if (!snap.exists()) return { success: false, message: 'Application not found' };
-    const oldStatus = snap.val()['الحالة'];
 
-    const patch = {
+    await update(nodeRef, {
       'ملاحظات الإدارة': notesValue,
       'سبب الرفض':       data.status === 'مرفوض' ? rejectionValue : '',
-      'الحالة':          data.status,
-      '_updated':        serverTimestamp()
-    };
-    await update(nodeRef, patch);
-    await update(ref(db, `${NODE_LIST}/${data.id}`), patch); // ⚡ يزامن appList
-    if (oldStatus !== data.status) await _changeStatusCount(oldStatus, data.status);
+      'الحالة':          data.status
+    });
 
     logAction('status_update', data.id, data.status);
     return { success: true, message: 'تم تحديث الحالة بنجاح' };
@@ -415,27 +282,10 @@ async function updateApplicationStatus(data) {
   }
 }
 
-// ⚡ بتغيّر عداد الحالة في stats (مستخدمة في updateApplicationStatus)
-async function _changeStatusCount(oldStatus, newStatus) {
-  const statsRef = ref(db, NODE_STATS);
-  await runTransaction(statsRef, (stats) => {
-    if (!stats) stats = { total: 0, pending: 0, accepted: 0, rejected: 0, waiting: 0, byDepartment: {}, byGender: {} };
-    const oldKey = _statusKey(oldStatus);
-    const newKey = _statusKey(newStatus);
-    if (oldKey && stats[oldKey]) stats[oldKey]--;
-    if (newKey) stats[newKey] = (stats[newKey] || 0) + 1;
-    return stats;
-  });
-}
-
 // ── Delete Application ────────────────────────────────────────
 async function deleteApplication(id) {
   try {
-    const snap = await get(ref(db, `${NODE_APPS}/${id}`));
-    const data = snap.exists() ? snap.val() : null;
     await remove(ref(db, `${NODE_APPS}/${id}`));
-    await remove(ref(db, `${NODE_LIST}/${id}`)); // ⚡ يشيل من appList برضه
-    if (data) await _updateStats(data, -1);
     logAction('delete', id, '');
     return { success: true };
   } catch (err) {
@@ -452,19 +302,8 @@ async function updateApplicationFields(id, patch) {
     const nodeRef = ref(db, `${NODE_APPS}/${id}`);
     const snap = await get(nodeRef);
     if (!snap.exists()) return { success: false, message: 'Application not found' };
-    const current = snap.val();
 
     await update(nodeRef, patch);
-
-    // بنستبعد حقول روابط المستندات من النسخة الخفيفة اللي بتتبعت لـ appList
-    const docKeys = ['شهادة التخرج','بيان درجات السنة الأولى','بيان درجات السنة الثانية','موقف من التجنيد','صورة البطاقة الشخصية','شهادة الميلاد','إفادة جهة العمل'];
-    const summaryPatch = {};
-    Object.keys(patch).forEach(k => { if (!docKeys.includes(k)) summaryPatch[k] = patch[k]; });
-    if (Object.keys(summaryPatch).length) await update(ref(db, `${NODE_LIST}/${id}`), summaryPatch);
-
-    const merged = { ...current, ...patch };
-    await _adjustStatsOnFieldChange(id, current, merged);
-
     logAction('admin_edit', id, 'تعديل بيانات الطلب بواسطة الإدارة');
     return { success: true, message: 'تم تحديث بيانات الطلب بنجاح' };
   } catch (err) {
@@ -475,11 +314,31 @@ async function updateApplicationFields(id, patch) {
 // ── Stats ────────────────────────────────────────────────────
 async function getStats() {
   try {
-    const snap = await get(ref(db, NODE_STATS));
-    if (!snap.exists()) {
-      return { success: true, stats: { total: 0, pending: 0, accepted: 0, rejected: 0, waiting: 0, byDepartment: {}, byGender: { ذكر: 0, أنثى: 0 } } };
-    }
-    return { success: true, stats: snap.val() };
+    const snap = await get(ref(db, NODE_APPS));
+    const val = snap.exists() ? snap.val() : {};
+    const applications = Object.keys(val).map(k => val[k]);
+
+    if (applications.length === 0) return { success: true, stats: { total: 0 } };
+
+    const stats = {
+      total: applications.length,
+      pending: 0, accepted: 0, rejected: 0, waiting: 0,
+      byDepartment: {},
+      byGender: { ذكر: 0, أنثى: 0 }
+    };
+
+    applications.forEach(a => {
+      const status = a['الحالة'], dept = a['القسم'], gender = a['النوع'];
+      if (status === 'قيد المراجعة') stats.pending++;
+      else if (status === 'مقبول') stats.accepted++;
+      else if (status === 'مرفوض') stats.rejected++;
+      else if (status === 'بانتظار المستندات') stats.waiting++;
+
+      stats.byDepartment[dept] = (stats.byDepartment[dept] || 0) + 1;
+      if (gender) stats.byGender[gender] = (stats.byGender[gender] || 0) + 1;
+    });
+
+    return { success: true, stats };
   } catch (err) {
     return { success: false, message: err.message || String(err) };
   }
@@ -490,9 +349,9 @@ function getDepartments() {
   return {
     success: true,
     departments: [
-      'قسم البصريات', 'قسم صحة المجتمع', 'قسم الإدارة',
-      'قسم التنفس الصناعي', 'قسم تركيبات الأسنان', 'قسم الأجهزة الطبية',
-      'قسم المختبرات', 'قسم الأشعة'
+      'قسم الأشعة', 'قسم المختبرات', 'قسم صحة المجتمع', 'قسم الإدارة',
+      'قسم التنفس الصناعي', 'قسم البصريات', 'قسم الأجهزة الطبية',
+      'قسم تركيبات الأسنان', 'أقسام أخرى'
     ]
   };
 }
@@ -591,8 +450,9 @@ window.dispatchEvent(new Event('firebase-api-ready'));
     flex-shrink: 0;
     box-shadow: 0 4px 12px rgba(26,110,142,.3);
     overflow: hidden;
+    padding: 4px;
   }
-  .logo-wrap img { width: 100%; height: 100%; object-fit: contain; }
+  .logo-wrap img { width: 100%; height: 100%; object-fit: contain; display: block; }
 
   .header-text h1 {
     font-size: 17px; font-weight: 800;
@@ -617,392 +477,14 @@ window.dispatchEvent(new Event('firebase-api-ready'));
     white-space: nowrap;
   }
 
-  /* ── Progress bar ─────────────────────────────────────── */
-  .progress-wrap {
-    max-width: 900px;
-    margin: 28px auto 0;
-    padding: 0 24px;
-  }
-
-  .steps-track {
-    display: flex;
-    align-items: center;
-    gap: 0;
-    position: relative;
-  }
-
-  .step-item {
-    display: flex; flex-direction: column; align-items: center;
-    flex: 1; position: relative; z-index: 1;
-  }
-
-  .step-circle {
-    width: 38px; height: 38px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 14px; font-weight: 800;
-    border: 2px solid var(--border);
-    background: var(--surface);
-    color: var(--text-3);
-    transition: all .35s ease;
-  }
-
-  .step-item.active .step-circle {
-    background: var(--primary); border-color: var(--primary);
-    color: #fff; box-shadow: 0 0 0 4px rgba(26,110,142,.15);
-  }
-
-  .step-item.done .step-circle {
-    background: var(--accent); border-color: var(--accent); color: #fff;
-  }
-
-  .step-label {
-    font-size: 11px; color: var(--text-3); margin-top: 6px;
-    font-weight: 600; text-align: center;
-    transition: color .35s;
-  }
-
-  .step-item.active .step-label { color: var(--primary); }
-  .step-item.done .step-label   { color: var(--accent); }
-
-  .step-line {
-    flex: 1; height: 2px; background: var(--border);
-    transition: background .35s;
-    position: relative; top: -10px;
-  }
-
-  .step-line.done { background: var(--accent); }
-
   /* ── Main layout ──────────────────────────────────────── */
-  .form-container {
+  .page-container {
     max-width: 900px;
     margin: 28px auto 60px;
     padding: 0 24px;
   }
 
-  /* ── Card ─────────────────────────────────────────────── */
-  .card {
-    background: var(--surface);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow);
-    border: 1px solid var(--border);
-    overflow: hidden;
-  }
-
-  .card-header {
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
-    padding: 22px 28px;
-    display: flex; align-items: center; gap: 14px;
-  }
-
-  .card-header-icon {
-    width: 42px; height: 42px; border-radius: 10px;
-    background: rgba(255,255,255,.18);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 20px;
-  }
-
-  .card-header h2 {
-    font-size: 18px; font-weight: 800; color: #fff;
-  }
-
-  .card-header p { font-size: 13px; color: rgba(255,255,255,.75); margin-top: 2px; }
-
-  .card-body { padding: 32px 28px; }
-
-  /* ── Section ──────────────────────────────────────────── */
-  .section { display: none; animation: fadeIn .4s ease; }
-  .section.active { display: block; }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-
-  /* ── Grid ─────────────────────────────────────────────── */
-  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
-  .col-span-2 { grid-column: span 2; }
-  .col-span-3 { grid-column: span 3; }
-
-  /* ── Form controls ────────────────────────────────────── */
-  .field { display: flex; flex-direction: column; gap: 7px; }
-
-  label {
-    font-size: 13px; font-weight: 700; color: var(--text-2);
-    display: flex; align-items: center; gap: 5px;
-  }
-
-  label .req { color: var(--danger); }
-  label .hint { font-size: 11px; color: var(--text-3); font-weight: 400; }
-
-  input, select, textarea {
-    width: 100%;
-    padding: 11px 14px;
-    border: 1.5px solid var(--border);
-    border-radius: var(--radius-sm);
-    font-family: var(--font-main);
-    font-size: 14px; font-weight: 500;
-    color: var(--text-1);
-    background: var(--surface-2);
-    transition: border-color .2s, box-shadow .2s, background .2s;
-    outline: none;
-  }
-
-  input:focus, select:focus, textarea:focus {
-    border-color: var(--primary);
-    background: var(--surface);
-    box-shadow: 0 0 0 3px rgba(26,110,142,.1);
-  }
-
-  input.error, select.error { border-color: var(--danger); }
-
-  .field-error {
-    font-size: 11px; color: var(--danger); font-weight: 600;
-    display: flex; align-items: center; gap: 4px;
-    opacity: 0; height: 0; overflow: hidden;
-    transition: opacity .2s, height .2s;
-  }
-
-  .field-error.visible { opacity: 1; height: auto; }
-
-  /* ── Radio group ──────────────────────────────────────── */
-  .radio-group { display: flex; gap: 10px; flex-wrap: wrap; }
-
-  .radio-opt {
-    display: flex; align-items: center; gap: 8px;
-    padding: 10px 18px;
-    border: 1.5px solid var(--border);
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all .2s;
-    font-size: 14px; font-weight: 600;
-    color: var(--text-2);
-    background: var(--surface-2);
-    user-select: none;
-  }
-
-  .radio-opt:hover { border-color: var(--primary); }
-  .radio-opt input { display: none; }
-  .radio-opt.selected {
-    border-color: var(--primary);
-    background: var(--primary-xlt);
-    color: var(--primary);
-  }
-
-  /* ── File upload ──────────────────────────────────────── */
-  .upload-area {
-    border: 2px dashed var(--border);
-    border-radius: var(--radius);
-    padding: 24px 16px;
-    text-align: center;
-    cursor: pointer;
-    transition: all .25s;
-    position: relative;
-    background: var(--surface-2);
-  }
-
-  .upload-area:hover { border-color: var(--primary); background: var(--primary-xlt); }
-
-  .upload-area input[type="file"] {
-    position: absolute; inset: 0; opacity: 0;
-    width: 100%; height: 100%; cursor: pointer;
-  }
-
-  .upload-icon { font-size: 30px; margin-bottom: 8px; }
-  .upload-title { font-size: 13px; font-weight: 700; color: var(--text-2); }
-  .upload-sub { font-size: 11px; color: var(--text-3); margin-top: 3px; }
-
-  .upload-preview {
-    margin-top: 10px;
-    display: flex; align-items: center; gap: 10px;
-    background: var(--success-bg);
-    border: 1px solid var(--accent);
-    border-radius: 8px;
-    padding: 8px 12px;
-    display: none;
-  }
-
-  .upload-preview img {
-    width: 48px; height: 48px;
-    object-fit: cover; border-radius: 6px;
-    border: 1px solid var(--border);
-  }
-
-  .upload-preview-name {
-    font-size: 12px; font-weight: 700; color: var(--success); flex: 1;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
-
-  .upload-spinner { display: none; }
-  .upload-area.error { border-color: var(--danger); background: var(--danger-bg); }
-  .upload-area.uploading { pointer-events: none; }
-  .upload-area.uploading .upload-spinner { display: block; }
-  .upload-area.uploading .upload-icon,
-  .upload-area.uploading .upload-title { display: none; }
-
-  .upload-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-  }
-
-  /* ── Divider ──────────────────────────────────────────── */
-  .divider {
-    display: flex; align-items: center; gap: 12px;
-    margin: 28px 0;
-  }
-
-  .divider::before, .divider::after {
-    content: ''; flex: 1; height: 1px; background: var(--border);
-  }
-
-  .divider-label {
-    font-size: 12px; font-weight: 700; color: var(--text-3);
-    text-transform: uppercase; letter-spacing: .5px;
-    white-space: nowrap;
-  }
-
-  /* ── Info banner ──────────────────────────────────────── */
-  .info-banner {
-    background: var(--warning-bg);
-    border: 1px solid rgba(200,151,43,.3);
-    border-radius: var(--radius);
-    padding: 16px 20px;
-    display: flex; gap: 12px;
-    margin-bottom: 28px;
-  }
-
-  .info-banner-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
-  .info-banner-text { font-size: 13px; color: var(--warning); line-height: 1.7; font-weight: 600; }
-  .info-banner-text strong { font-weight: 800; }
-
-  /* ── Open departments banner ──────────────────────────── */
-  .depts-open-banner {
-    max-width: 900px;
-    margin: 0 auto 18px;
-    padding: 16px 20px;
-    background: linear-gradient(135deg, rgba(26,110,142,.08), rgba(26,110,142,.03));
-    border: 1px solid rgba(26,110,142,.25);
-    border-radius: var(--radius);
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-  }
-  .depts-open-banner-icon {
-    font-size: 20px; flex-shrink: 0; margin-top: 2px;
-  }
-  .depts-open-banner-body { flex: 1; min-width: 0; }
-  .depts-open-banner-title {
-    font-size: 13px; font-weight: 800; color: var(--primary);
-    margin-bottom: 10px; line-height: 1.6;
-  }
-  .depts-open-chips {
-    display: flex; flex-wrap: wrap; gap: 8px;
-  }
-  .depts-open-chip {
-    display: inline-flex; align-items: center; gap: 5px;
-    background: #fff; color: var(--primary);
-    border: 1px solid rgba(26,110,142,.3);
-    border-radius: 999px;
-    padding: 5px 13px;
-    font-size: 12.5px; font-weight: 700;
-    white-space: nowrap;
-  }
-  .depts-open-chip::before { content: '✓'; color: var(--success); font-weight: 800; }
-  @media (max-width: 640px) {
-    .depts-open-banner { margin: 0 12px 16px; }
-  }
-
-  /* ── Edit-mode banner ─────────────────────────────────── */
-  .edit-mode-banner {
-    max-width: 900px;
-    margin: 20px auto 0;
-    padding: 14px 20px;
-    background: var(--primary-xlt);
-    border: 1.5px solid var(--primary-light);
-    border-radius: var(--radius);
-    display: flex; align-items: center; gap: 14px;
-    flex-wrap: wrap;
-  }
-  .edit-mode-banner-text {
-    font-size: 13px; font-weight: 700; color: var(--primary);
-    line-height: 1.6; flex: 1; min-width: 220px;
-  }
-  .edit-mode-banner-cancel {
-    background: none; border: 1.5px solid var(--primary); color: var(--primary);
-    border-radius: var(--radius-sm); padding: 8px 16px;
-    font-family: var(--font-main); font-size: 12px; font-weight: 700;
-    cursor: pointer; white-space: nowrap; transition: all .2s;
-  }
-  .edit-mode-banner-cancel:hover { background: var(--primary); color: #fff; }
-
-  /* ── Rejection alert ──────────────────────────────────── */
-  .rejection-alert {
-    background: var(--danger-bg);
-    border: 2px solid var(--danger);
-    border-radius: var(--radius);
-    padding: 24px;
-    display: none;
-  }
-
-  .rejection-alert h3 {
-    color: var(--danger); font-size: 18px; font-weight: 800;
-    margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
-  }
-
-  .rejection-reason {
-    background: rgba(192,57,43,.07);
-    border-radius: 8px; padding: 12px 16px;
-    font-size: 14px; color: var(--danger);
-    line-height: 1.9; font-weight: 600;
-    margin-bottom: 10px;
-  }
-
-  /* ── Success screen ───────────────────────────────────── */
-  .success-screen {
-    text-align: center; padding: 60px 20px;
-  }
-
-  .success-circle {
-    width: 90px; height: 90px; border-radius: 50%;
-    background: var(--success-bg);
-    border: 3px solid var(--accent);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 40px; margin: 0 auto 24px;
-    animation: pop .5s cubic-bezier(.18,.89,.32,1.28);
-  }
-
-  @keyframes pop {
-    from { transform: scale(0); opacity: 0; }
-    to   { transform: scale(1); opacity: 1; }
-  }
-
-  .success-screen h2 {
-    font-size: 24px; font-weight: 800; color: var(--success);
-    margin-bottom: 10px;
-  }
-
-  .success-screen p { color: var(--text-2); font-size: 15px; line-height: 1.8; }
-
-  .app-id-box {
-    display: inline-block;
-    background: var(--primary-xlt);
-    border: 1.5px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px 32px;
-    margin: 24px 0;
-  }
-
-  .app-id-label { font-size: 12px; color: var(--text-3); font-weight: 600; }
-  .app-id-value { font-size: 22px; font-weight: 800; color: var(--primary); margin-top: 4px; letter-spacing: 1px; }
-
   /* ── Buttons ──────────────────────────────────────────── */
-  .btn-row {
-    display: flex; gap: 12px; justify-content: flex-end;
-    margin-top: 32px; padding-top: 24px;
-    border-top: 1px solid var(--border);
-  }
-
   .btn {
     display: inline-flex; align-items: center; gap: 8px;
     padding: 12px 28px;
@@ -1028,13 +510,6 @@ window.dispatchEvent(new Event('firebase-api-ready'));
   .btn-primary:active { transform: translateY(0); }
   .btn-primary:disabled { opacity: .6; cursor: not-allowed; transform: none; }
 
-  .btn-accent {
-    background: linear-gradient(135deg, var(--accent) 0%, #0d9590 100%);
-    color: #fff;
-    box-shadow: 0 4px 12px rgba(14,168,158,.3);
-  }
-  .btn-accent:hover { box-shadow: 0 6px 20px rgba(14,168,158,.4); transform: translateY(-1px); }
-
   /* ── Spinner ──────────────────────────────────────────── */
   .spinner {
     width: 18px; height: 18px;
@@ -1047,28 +522,201 @@ window.dispatchEvent(new Event('firebase-api-ready'));
 
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* ── Gender show/hide military ────────────────────────── */
-  #military-section { transition: all .3s; }
-
-  /* ── Upload docs grid ─────────────────────────────────── */
-  .docs-section-title {
-    font-size: 14px; font-weight: 800; color: var(--primary);
-    margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
-    padding: 10px 14px;
-    background: var(--primary-xlt);
-    border-radius: 8px;
-    border-right: 4px solid var(--primary);
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
 
-  /* ── Percentage live bar ──────────────────────────────── */
-  .pct-bar-wrap { height: 5px; background: var(--border); border-radius: 3px; margin-top: 5px; }
-  .pct-bar { height: 100%; border-radius: 3px; width: 0; transition: width .4s, background .4s; }
+  label { font-size: 13px; font-weight: 700; color: var(--text-2); display: flex; align-items: center; gap: 5px; }
+  label .req { color: var(--danger); }
+  label .hint { font-size: 11px; color: var(--text-3); font-weight: 400; }
+  .field { display: flex; flex-direction: column; gap: 7px; }
+
+  input, select, textarea {
+    width: 100%;
+    padding: 11px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-main);
+    font-size: 14px; font-weight: 500;
+    color: var(--text-1);
+    background: var(--surface-2);
+    transition: border-color .2s, box-shadow .2s, background .2s;
+    outline: none;
+  }
+
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--primary);
+    background: var(--surface);
+    box-shadow: 0 0 0 3px rgba(26,110,142,.1);
+  }
+
+  input.error, select.error { border-color: var(--danger); }
+
+  /* ═══════════════════════════════════════════════════════
+     Closed submission notice — hero card
+     ═══════════════════════════════════════════════════════ */
+  .closed-card {
+    position: relative;
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border);
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+
+  .closed-card::before {
+    content: '';
+    position: absolute; inset: 0 0 auto 0;
+    height: 6px;
+    background: linear-gradient(90deg, var(--primary) 0%, var(--accent) 50%, var(--gold) 100%);
+  }
+
+  .closed-hero {
+    padding: 52px 32px 44px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .closed-hero::before,
+  .closed-hero::after {
+    content: '';
+    position: absolute;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(26,110,142,.08) 0%, rgba(26,110,142,0) 70%);
+    z-index: 0;
+  }
+  .closed-hero::before { width: 340px; height: 340px; top: -140px; right: -100px; }
+  .closed-hero::after  { width: 260px; height: 260px; bottom: -120px; left: -80px;
+    background: radial-gradient(circle, rgba(14,168,158,.08) 0%, rgba(14,168,158,0) 70%); }
+
+  .closed-icon-ring {
+    position: relative;
+    z-index: 1;
+    width: 104px; height: 104px;
+    margin: 0 auto 26px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 10px 34px rgba(26,110,142,.35);
+    animation: floatIcon 3.4s ease-in-out infinite;
+  }
+
+  .closed-icon-ring::before {
+    content: '';
+    position: absolute; inset: -10px;
+    border-radius: 50%;
+    border: 2px solid rgba(26,110,142,.25);
+    animation: ringPulse 2.6s ease-out infinite;
+  }
+
+  @keyframes floatIcon {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-6px); }
+  }
+
+  @keyframes ringPulse {
+    0%   { transform: scale(1);   opacity: .9; }
+    100% { transform: scale(1.35); opacity: 0; }
+  }
+
+  .closed-icon-ring span { font-size: 46px; line-height: 1; }
+
+  .closed-eyebrow {
+    position: relative; z-index: 1;
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--warning-bg);
+    color: var(--warning);
+    border: 1px solid rgba(184,114,10,.25);
+    border-radius: 20px;
+    padding: 6px 18px;
+    font-size: 12.5px; font-weight: 800;
+    letter-spacing: .3px;
+    margin-bottom: 18px;
+  }
+  .closed-eyebrow .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--warning);
+    animation: dotBlink 1.4s ease-in-out infinite;
+  }
+  @keyframes dotBlink { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+
+  .closed-title {
+    position: relative; z-index: 1;
+    font-size: 27px; font-weight: 800;
+    color: var(--text-1);
+    line-height: 1.45;
+    margin-bottom: 12px;
+  }
+  .closed-title .accent-word {
+    background: linear-gradient(120deg, var(--primary) 0%, var(--accent) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .closed-sub {
+    position: relative; z-index: 1;
+    font-size: 15.5px; color: var(--text-2); font-weight: 600;
+    max-width: 560px; margin: 0 auto;
+    line-height: 1.9;
+  }
+
+  .closed-sub strong { color: var(--primary); font-weight: 800; }
+
+  .closed-divider {
+    position: relative; z-index: 1;
+    width: 64px; height: 3px; border-radius: 3px;
+    background: linear-gradient(90deg, var(--primary), var(--accent));
+    margin: 26px auto;
+  }
+
+  .closed-status-row {
+    position: relative; z-index: 1;
+    display: flex; align-items: center; justify-content: center;
+    gap: 10px; flex-wrap: wrap;
+  }
+
+  .closed-status-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--primary-xlt);
+    border: 1px solid var(--border);
+    color: var(--primary);
+    padding: 9px 20px;
+    border-radius: 30px;
+    font-size: 13.5px; font-weight: 700;
+  }
+
+  .closed-info-grid {
+    position: relative; z-index: 1;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-top: 34px;
+    padding-top: 30px;
+    border-top: 1px dashed var(--border);
+  }
+
+  .closed-info-item {
+    text-align: center;
+    padding: 4px 8px;
+  }
+  .closed-info-icon { font-size: 22px; margin-bottom: 8px; }
+  .closed-info-label { font-size: 12.5px; font-weight: 700; color: var(--text-2); line-height: 1.6; }
+
+  @media (max-width: 640px) {
+    .closed-hero { padding: 40px 20px 34px; }
+    .closed-title { font-size: 21px; }
+    .closed-sub { font-size: 14px; }
+    .closed-info-grid { grid-template-columns: 1fr; gap: 18px; }
+  }
 
   /* ── Status Inquiry ────────────────────────────────────── */
   .inquiry-section {
     max-width: 900px;
-    margin: 24px auto 0;
-    padding: 0 24px;
+    margin: 0 auto;
   }
 
   .inquiry-toggle-btn {
@@ -1187,6 +835,11 @@ window.dispatchEvent(new Event('firebase-api-ready'));
     padding: 14px 18px;
     font-size: 13px; color: var(--primary); font-weight: 600;
     line-height: 1.8;
+  }
+  .iq-closed-note {
+    margin-top: 10px;
+    font-size: 12px; color: var(--text-3); text-align: center;
+    font-weight: 600; line-height: 1.7;
   }
 
   .iq-not-found {
@@ -1335,39 +988,26 @@ window.dispatchEvent(new Event('firebase-api-ready'));
 
   /* ── Responsive ───────────────────────────────────────── */
   @media (max-width: 680px) {
-    .grid-2, .grid-3 { grid-template-columns: 1fr; }
-    .col-span-2, .col-span-3 { grid-column: span 1; }
-    .card-body { padding: 20px 16px; }
-    .upload-grid { grid-template-columns: 1fr; }
     .header-inner { gap: 10px; }
     .badge-univ { display: none; }
     .header-text h1 { font-size: 14px; }
-    .progress-wrap { margin-top: 16px; }
-    .step-label { font-size: 10px; }
-    .step-circle { width: 32px; height: 32px; font-size: 12px; }
+    .logo-wrap { width: 52px; height: 52px; }
     .inquiry-input-row { flex-direction: column; }
     .inquiry-input-row .btn { width: 100%; justify-content: center; }
     .iq-result-body { grid-template-columns: 1fr; }
-    .form-container { margin: 16px auto 40px; }
-    .btn-row { flex-wrap: wrap; }
-    .btn-row .btn { flex: 1; justify-content: center; min-width: 120px; }
+    .page-container { margin: 16px auto 40px; }
     .dialog-box { max-width: 100%; }
     .dialog-header { padding: 18px 18px 14px; }
     .dialog-body { padding: 14px 18px 20px; }
     .dialog-footer { padding: 0 18px 18px; }
-    .inquiry-section { margin-top: 16px; }
-    .card-header { padding: 18px 20px; }
-    .card-header h2 { font-size: 16px; }
   }
 
   @media (max-width: 400px) {
     .header-inner { padding: 10px 14px; }
-    .logo-wrap { width: 46px; height: 46px; font-size: 22px; }
-    .steps-track { gap: 0; }
-    .step-line { min-width: 10px; }
-    .progress-wrap { padding: 0 14px; }
-    .form-container { padding: 0 14px; }
-    .inquiry-section { padding: 0 14px; }
+    .logo-wrap { width: 42px; height: 42px; font-size: 22px; padding: 3px; }
+    .header-text h1 { font-size: 13px; }
+    .header-text p { font-size: 10.5px; }
+    .page-container { padding: 0 14px; }
   }
 </style>
 </head>
@@ -1408,464 +1048,100 @@ window.dispatchEvent(new Event('firebase-api-ready'));
   </div>
 </div>
 
-<!-- ── Status Inquiry ────────────────────────────────────── -->
-<div class="inquiry-section">
-  <button class="inquiry-toggle-btn" id="inquiry-toggle-btn" onclick="toggleInquiry()">
-    <div class="iq-icon">🔍</div>
-    <div>
-      <div>الاستعلام عن حالة الطلب</div>
-      <div style="font-size:11px; font-weight:500; color:var(--text-3); margin-top:1px;">تحقق من حالة طلبك برقمك القومي</div>
-    </div>
-    <span class="iq-arrow">▼</span>
-  </button>
-  <div class="inquiry-panel" id="inquiry-panel">
-    <div class="inquiry-input-row">
-      <div class="field">
-        <label>الرقم القومي أو الاسم <span class="req">*</span></label>
-        <input type="text" id="iq-national-id" placeholder="أدخل الرقم القومي (14 رقم) أو الاسم بالكامل" dir="auto"
-          onkeydown="if(event.key==='Enter') checkStatus()">
+<div class="page-container">
+
+  <!-- ── Status Inquiry ────────────────────────────────────── -->
+  <div class="inquiry-section">
+    <button class="inquiry-toggle-btn" id="inquiry-toggle-btn" onclick="toggleInquiry()">
+      <div class="iq-icon">🔍</div>
+      <div>
+        <div>الاستعلام عن حالة الطلب</div>
+        <div style="font-size:11px; font-weight:500; color:var(--text-3); margin-top:1px;">تحقق من حالة طلبك برقمك القومي</div>
       </div>
-      <button class="btn btn-primary" onclick="checkStatus()" id="iq-btn" style="padding:11px 24px; white-space:nowrap;">
-        <span id="iq-btn-text">🔍 استعلام</span>
-        <span id="iq-btn-spinner" style="display:none;"><span class="spinner"></span></span>
-      </button>
-    </div>
+      <span class="iq-arrow">▼</span>
+    </button>
+    <div class="inquiry-panel" id="inquiry-panel">
+      <div class="inquiry-input-row">
+        <div class="field">
+          <label>الرقم القومي أو الاسم <span class="req">*</span></label>
+          <input type="text" id="iq-national-id" placeholder="أدخل الرقم القومي (14 رقم) أو الاسم بالكامل" dir="auto"
+            onkeydown="if(event.key==='Enter') checkStatus()">
+        </div>
+        <button class="btn btn-primary" onclick="checkStatus()" id="iq-btn" style="padding:11px 24px; white-space:nowrap;">
+          <span id="iq-btn-text">🔍 استعلام</span>
+          <span id="iq-btn-spinner" style="display:none;"><span class="spinner"></span></span>
+        </button>
+      </div>
 
-    <!-- Result -->
-    <div class="inquiry-result" id="iq-result">
-      <div class="iq-result-header" id="iq-result-header"></div>
-      <div class="iq-result-body" id="iq-result-body"></div>
-      <div id="iq-notes-wrap" style="padding:0 20px 18px;"></div>
-    </div>
+      <!-- Result -->
+      <div class="inquiry-result" id="iq-result">
+        <div class="iq-result-header" id="iq-result-header"></div>
+        <div class="iq-result-body" id="iq-result-body"></div>
+        <div id="iq-notes-wrap" style="padding:0 20px 18px;"></div>
+      </div>
 
-    <!-- Multiple matches (بحث بالاسم) -->
-    <div class="iq-multi-results" id="iq-multi-results">
-      <div class="iq-multi-title">تم العثور على أكثر من نتيجة، اختر الطلب المطلوب:</div>
-      <div id="iq-multi-list"></div>
-    </div>
+      <!-- Multiple matches (بحث بالاسم) -->
+      <div class="iq-multi-results" id="iq-multi-results">
+        <div class="iq-multi-title">تم العثور على أكثر من نتيجة، اختر الطلب المطلوب:</div>
+        <div id="iq-multi-list"></div>
+      </div>
 
-    <!-- Not found -->
-    <div class="iq-not-found" id="iq-not-found">
-      <div style="font-size:36px;">🔎</div>
-      <p>لم يتم العثور على طلب مطابق.<br>
-        <span style="font-size:12px; color:var(--text-3); font-weight:500;">تأكد من صحة الرقم القومي أو الاسم، أو تواصل مع إدارة الكلية.</span>
-      </p>
-    </div>
-  </div>
-</div>
-
-<!-- ── Edit mode banner (يظهر عند تعديل طلب مُرسَل مسبقًا) ── -->
-<div class="edit-mode-banner" id="edit-mode-banner" style="display:none;">
-  <div class="edit-mode-banner-text">
-    ✏️ أنت الآن تُعدّل الطلب رقم <span id="edit-mode-app-id" style="font-family:monospace;"></span> —
-    سيتم إعادة طلبك لحالة «قيد المراجعة» بعد حفظ التعديلات.
-  </div>
-  <button class="edit-mode-banner-cancel" onclick="cancelEdit()">إلغاء والعودة لطلب جديد</button>
-</div>
-
-<!-- ── Open departments banner (مبني تلقائيًا من OPEN_DEPARTMENTS، فمينفعش يحصل تعارض مع القايمة الفعلية) ── -->
-<div class="depts-open-banner">
-  <span class="depts-open-banner-icon">🎓</span>
-  <div class="depts-open-banner-body">
-    <div class="depts-open-banner-title">التقديم متاح حاليًا للأقسام التالية فقط:</div>
-    <div class="depts-open-chips" id="depts-open-chips"><!-- يتم ملؤها تلقائيًا بالجافاسكريبت --></div>
-  </div>
-</div>
-
-<!-- ── Progress ────────────────────────────────────────── -->
-<div class="progress-wrap">
-  <div class="steps-track">
-    <div class="step-item active" id="step-dot-1">
-      <div class="step-circle">١</div>
-      <span class="step-label">البيانات الشخصية</span>
-    </div>
-    <div class="step-line" id="line-1-2"></div>
-    <div class="step-item" id="step-dot-2">
-      <div class="step-circle">٢</div>
-      <span class="step-label">البيانات الأكاديمية</span>
-    </div>
-    <div class="step-line" id="line-2-3"></div>
-    <div class="step-item" id="step-dot-3">
-      <div class="step-circle">٣</div>
-      <span class="step-label">بيانات التواصل</span>
-    </div>
-    <div class="step-line" id="line-3-4"></div>
-    <div class="step-item" id="step-dot-4">
-      <div class="step-circle">٤</div>
-      <span class="step-label">المستندات</span>
-    </div>
-    <div class="step-line" id="line-4-5"></div>
-    <div class="step-item" id="step-dot-5">
-      <div class="step-circle">٥</div>
-      <span class="step-label">المراجعة والإرسال</span>
-    </div>
-  </div>
-</div>
-
-<!-- ── Form ─────────────────────────────────────────────── -->
-<div class="form-container">
-  <div class="card">
-
-    <!-- Rejection alert (shown inline before submit) -->
-    <div class="card-body" id="rejection-wrap" style="display:none; padding-bottom:0;">
-      <div class="rejection-alert" id="rejection-alert">
-        <h3>❌ عذرًا، لا يمكن استكمال التقديم</h3>
-        <div id="rejection-reasons"></div>
-        <p style="font-size:13px; color:var(--text-2); margin-top:12px;">
-          إذا كنت تعتقد أن هناك خطأ في البيانات، يرجى التواصل مع إدارة الكلية.
+      <!-- Not found -->
+      <div class="iq-not-found" id="iq-not-found">
+        <div style="font-size:36px;">🔎</div>
+        <p>لم يتم العثور على طلب مطابق.<br>
+          <span style="font-size:12px; color:var(--text-3); font-weight:500;">تأكد من صحة الرقم القومي أو الاسم، أو تواصل مع إدارة الكلية.</span>
         </p>
       </div>
     </div>
+  </div>
 
-    <!-- ── SECTION 1: Personal ──────────────────────────── -->
-    <div class="section active" id="section-1">
-      <div class="card-header">
-        <div class="card-header-icon">👤</div>
-        <div>
-          <h2>البيانات الشخصية</h2>
-          <p>الخطوة الأولى من خمس خطوات</p>
-        </div>
+  <!-- ── Closed submission notice ─────────────────────────── -->
+  <div class="closed-card">
+    <div class="closed-hero">
+      <div class="closed-icon-ring"><span>🔒</span></div>
+
+      <div class="closed-eyebrow"><span class="dot"></span> إعلان هام</div>
+
+      <h1 class="closed-title">
+        تم غلق باب التقدم <span class="accent-word">الإلكتروني</span>
+      </h1>
+      <p class="closed-sub">
+        وصلت الكلية لعدد كبير من الطلبات، ونود إعلام جميع المتقدمين أن استقبال
+        الطلبات الجديدة قد <strong>توقف الآن</strong>، وجاري العمل حالياً على
+        <strong>مراجعة البيانات</strong> المُقدَّمة بدقة تامة.
+      </p>
+
+      <div class="closed-divider"></div>
+
+      <div class="closed-status-row">
+        <span class="closed-status-pill">🕐 جاري مراجعة البيانات</span>
       </div>
-      <div class="card-body">
 
-        <div class="info-banner">
-          <span class="info-banner-icon">ℹ️</span>
-          <div class="info-banner-text">
-            يُرجى التأكد من صحة جميع البيانات المُدخلة. <strong>الشروط:</strong>
-            ألا يتجاوز السن 30 عامًا، وألا يكون قد مضى على التخرج أكثر من 10 سنوات، وأن يكون التقدير «جيد جداً» على الأقل.
-          </div>
+      <div class="closed-info-grid">
+        <div class="closed-info-item">
+          <div class="closed-info-icon">📋</div>
+          <div class="closed-info-label">يتم فحص كل طلب<br>على حدة بعناية</div>
         </div>
-
-        <div style="display:grid; gap:20px;">
-          <div class="field">
-            <label>الاسم الرباعي باللغة العربية <span class="req">*</span>
-              <span class="hint">(الاسم كاملاً كما هو في البطاقة)</span>
-            </label>
-            <input type="text" id="fullName" placeholder="مثال: محمد أحمد علي إبراهيم" dir="rtl">
-            <div class="field-error" id="err-fullName">⚠ يرجى إدخال الاسم الرباعي كاملاً باللغة العربية</div>
-          </div>
-
-          <div class="grid-2">
-            <div class="field">
-              <label>الرقم القومي <span class="req">*</span></label>
-              <input type="text" id="nationalId" maxlength="14" placeholder="14 رقم" dir="ltr" style="letter-spacing:2px;">
-              <div class="field-error" id="err-nationalId">⚠ الرقم القومي يجب أن يكون 14 رقمًا</div>
-            </div>
-            <div class="field">
-              <label>النوع <span class="req">*</span></label>
-              <div class="radio-group" id="gender-group">
-                <label class="radio-opt" onclick="selectRadio('gender','ذكر',this)">
-                  <input type="radio" name="gender" value="ذكر"> 👨 ذكر
-                </label>
-                <label class="radio-opt" onclick="selectRadio('gender','أنثى',this)">
-                  <input type="radio" name="gender" value="أنثى"> 👩 أنثى
-                </label>
-              </div>
-              <div class="field-error" id="err-gender">⚠ يرجى تحديد النوع</div>
-            </div>
-          </div>
-
-          <div class="grid-2">
-            <div class="field">
-              <label>المحافظة <span class="req">*</span></label>
-              <select id="governorate">
-                <option value="">— اختر المحافظة —</option>
-                <option>القاهرة</option><option>الجيزة</option><option>الإسكندرية</option>
-                <option>بني سويف</option><option>الفيوم</option><option>المنيا</option>
-                <option>أسيوط</option><option>سوهاج</option><option>قنا</option>
-                <option>الأقصر</option><option>أسوان</option><option>البحر الأحمر</option>
-                <option>الدقهلية</option><option>الغربية</option><option>المنوفية</option>
-                <option>القليوبية</option><option>الشرقية</option><option>كفر الشيخ</option>
-                <option>البحيرة</option><option>الإسماعيلية</option><option>السويس</option>
-                <option>بورسعيد</option><option>دمياط</option><option>شمال سيناء</option>
-                <option>جنوب سيناء</option><option>وادي الجديد</option><option>مطروح</option>
-              </select>
-              <div class="field-error" id="err-governorate">⚠ يرجى اختيار المحافظة</div>
-            </div>
-
-            <div class="field">
-              <label>القسم بالمعهد <span class="req">*</span></label>
-              <select id="department">
-                <option value="">— اختر القسم —</option>
-                <!-- يتم ملء باقي الخيارات تلقائيًا من نفس القائمة المستخدمة في تنويه الأقسام المفتوحة أعلى الصفحة -->
-              </select>
-              <div class="field-error" id="err-department">⚠ يرجى اختيار القسم</div>
-            </div>
-          </div>
+        <div class="closed-info-item">
+          <div class="closed-info-icon">🔍</div>
+          <div class="closed-info-label">تابع حالة طلبك من<br>خانة الاستعلام أدناه</div>
         </div>
-
-        <div class="btn-row">
-          <button class="btn btn-primary" id="next-step1-btn" onclick="nextStep(1)">
-            <span id="next-step1-text">التالي <span>←</span></span>
-            <span id="next-step1-spinner" class="spinner" style="display:none;"></span>
-          </button>
+        <div class="closed-info-item">
+          <div class="closed-info-icon">📢</div>
+          <div class="closed-info-label">ستصلكم النتيجة<br>فور اعتمادها</div>
         </div>
       </div>
     </div>
+  </div>
 
-    <!-- ── SECTION 2: Academic ──────────────────────────── -->
-    <div class="section" id="section-2">
-      <div class="card-header">
-        <div class="card-header-icon">🎓</div>
-        <div>
-          <h2>البيانات الأكاديمية</h2>
-          <p>الخطوة الثانية من خمس خطوات</p>
-        </div>
-      </div>
-      <div class="card-body">
-
-        <div style="display:grid; gap:20px;">
-          <div class="grid-3">
-            <div class="field">
-              <label>سنة التخرج <span class="req">*</span></label>
-              <select id="graduationYear">
-                <option value="">— السنة —</option>
-              </select>
-              <div class="field-error" id="err-graduationYear">⚠ يرجى اختيار سنة التخرج</div>
-            </div>
-
-            <div class="field">
-              <label>التقدير <span class="req">*</span></label>
-              <select id="grade">
-                <option value="">— التقدير —</option>
-                <option>امتياز مع مرتبة الشرف</option>
-                <option>ممتاز</option>
-                <option>جيد جداً</option>
-                <option>جيد</option>
-                <option>مقبول</option>
-              </select>
-              <div class="field-error" id="err-grade">⚠ يرجى اختيار التقدير</div>
-            </div>
-
-            <div class="field">
-              <label>النسبة المئوية <span class="req">*</span> <span class="hint">(%)</span></label>
-              <input type="number" id="percentage" placeholder="مثال: 85.5" min="50" max="100" step="0.1">
-              <div class="pct-bar-wrap"><div class="pct-bar" id="pct-bar"></div></div>
-              <div class="field-error" id="err-percentage">⚠ يرجى إدخال النسبة المئوية</div>
-            </div>
-          </div>
-
-          <div class="grid-2">
-            <div class="field">
-              <label>المجموع <span class="hint">(الدرجات الكلية)</span></label>
-              <input type="text" id="total" placeholder="مثال: 1450 / 1800">
-            </div>
-
-            <div class="field" id="military-section" style="display:none;">
-              <label>الموقف من التجنيد <span class="req">*</span></label>
-              <select id="militaryStatus">
-                <option value="">— اختر —</option>
-                <option>أدى الخدمة العسكرية</option>
-                <option>معفى من الخدمة</option>
-                <option>مؤجل بسبب الدراسة</option>
-                <option>تحت الخدمة حالياً</option>
-                <option>لم يُستدعَ بعد</option>
-              </select>
-              <div class="field-error" id="err-militaryStatus">⚠ يرجى تحديد الموقف من التجنيد</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="btn-row">
-          <button class="btn btn-outline" onclick="prevStep(2)">← السابق</button>
-          <button class="btn btn-primary" onclick="nextStep(2)">التالي ←</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── SECTION 3: Contact ───────────────────────────── -->
-    <div class="section" id="section-3">
-      <div class="card-header">
-        <div class="card-header-icon">📱</div>
-        <div>
-          <h2>بيانات التواصل</h2>
-          <p>الخطوة الثالثة من خمس خطوات</p>
-        </div>
-      </div>
-      <div class="card-body">
-        <div style="display:grid; gap:20px;">
-          <div class="grid-2">
-            <div class="field">
-              <label>رقم التليفون <span class="req">*</span></label>
-              <input type="tel" id="phone" placeholder="01xxxxxxxxx" dir="ltr">
-              <div class="field-error" id="err-phone">⚠ يرجى إدخال رقم هاتف صحيح</div>
-            </div>
-            <div class="field">
-              <label>رقم الواتساب <span class="req">*</span></label>
-              <input type="tel" id="whatsapp" placeholder="01xxxxxxxxx" dir="ltr">
-              <div class="field-error" id="err-whatsapp">⚠ يرجى إدخال رقم واتساب صحيح</div>
-            </div>
-          </div>
-          <div class="field">
-            <label>البريد الإلكتروني <span class="req">*</span></label>
-            <input type="email" id="email" placeholder="example@email.com" dir="ltr">
-            <div class="field-error" id="err-email">⚠ يرجى إدخال بريد إلكتروني صحيح</div>
-          </div>
-        </div>
-
-        <div class="btn-row">
-          <button class="btn btn-outline" onclick="prevStep(3)">← السابق</button>
-          <button class="btn btn-primary" onclick="nextStep(3)">التالي ←</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── SECTION 4: Documents ─────────────────────────── -->
-    <div class="section" id="section-4">
-      <div class="card-header">
-        <div class="card-header-icon">📎</div>
-        <div>
-          <h2>رفع المستندات</h2>
-          <p>الخطوة الرابعة من خمس خطوات</p>
-        </div>
-      </div>
-      <div class="card-body">
-
-        <div class="info-banner" style="margin-bottom:24px;">
-          <span class="info-banner-icon">📌</span>
-          <div class="info-banner-text">
-            يُرجى رفع صور واضحة وكاملة للمستندات. <strong>الصيغ المقبولة:</strong> JPG, PNG فقط — بحد أقصى 5MB لكل ملف. <strong>المستندات المميزة بـ (*) إجبارية</strong> وباقي المستندات اختيارية.
-          </div>
-        </div>
-
-        <!-- 1. شهادة التخرج -->
-        <div class="docs-section-title">١ — شهادة التخرج</div>
-        <div style="margin-bottom:20px;">
-          <div class="field">
-            <label>شهادة التخرج <span class="req">*</span></label>
-            <div class="upload-area" id="upload-cert_grad">
-              <input type="file" accept="image/*" onchange="handleUpload(this,'cert_grad')">
-              <div class="upload-icon">📜</div>
-              <div class="upload-title">اضغط لرفع الملف</div>
-              <div class="upload-sub">JPG / PNG — حتى 5MB</div>
-              <div class="upload-spinner">⏳ جاري الرفع...</div>
-            </div>
-            <div class="upload-preview" id="preview-cert_grad">
-              <img id="img-cert_grad" src="" alt="">
-              <span class="upload-preview-name" id="name-cert_grad"></span>
-              <span style="color:var(--success)">✓</span>
-            </div>
-            <div class="field-error" id="err-cert_grad">⚠ يرجى رفع صورة شهادة التخرج</div>
-          </div>
-        </div>
-
-        <!-- 2. موقف من التجنيد (للذكور) -->
-        <div class="docs-section-title" id="military-doc-title">٢ — موقف من التجنيد <span style="font-size:12px; color:var(--text-3); font-weight:500;">(للذكور — تأدية أو إعفاء نهائي)</span></div>
-        <div style="margin-bottom:20px;">
-          <div class="field">
-            <label>موقف من التجنيد</label>
-            <div class="upload-area" id="upload-military_doc">
-              <input type="file" accept="image/*" onchange="handleUpload(this,'military_doc')">
-              <div class="upload-icon">🪖</div>
-              <div class="upload-title">اضغط لرفع الملف</div>
-              <div class="upload-sub">JPG / PNG — حتى 5MB</div>
-              <div class="upload-spinner">⏳ جاري الرفع...</div>
-            </div>
-            <div class="upload-preview" id="preview-military_doc">
-              <img id="img-military_doc" src="" alt="">
-              <span class="upload-preview-name" id="name-military_doc"></span>
-              <span style="color:var(--success)">✓</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="btn-row">
-          <button class="btn btn-outline" onclick="prevStep(4)">← السابق</button>
-          <button class="btn btn-primary" onclick="nextStep(4)">التالي ←</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── SECTION 5: Review ────────────────────────────── -->
-    <div class="section" id="section-5">
-      <div class="card-header">
-        <div class="card-header-icon">✅</div>
-        <div>
-          <h2>مراجعة البيانات وإرسال الطلب</h2>
-          <p>الخطوة الخامسة — تحقق من بياناتك قبل الإرسال</p>
-        </div>
-      </div>
-      <div class="card-body">
-        <div id="review-content" style="display:grid; gap:16px;"></div>
-
-        <div class="btn-row">
-          <button class="btn btn-outline" onclick="prevStep(5)">← السابق</button>
-          <button class="btn btn-accent" id="submit-btn" onclick="submitForm()">
-            <span id="submit-text">إرسال الطلب 📨</span>
-            <span id="submit-spinner" style="display:none;"><span class="spinner"></span> جاري الإرسال...</span>
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── SUCCESS ───────────────────────────────────────── -->
-    <div class="section" id="section-success">
-      <div class="card-body">
-        <div class="success-screen">
-          <div class="success-circle" id="success-circle">🎉</div>
-          <h2 id="success-title">تم إرسال طلبك بنجاح!</h2>
-          <p id="success-desc">شكرًا لتقديمك. سيتم مراجعة طلبك من قِبَل إدارة الكلية وإبلاغك بالنتيجة.</p>
-          <div class="app-id-box">
-            <div class="app-id-label">رقم طلبك المرجعي</div>
-            <div class="app-id-value" id="success-app-id">—</div>
-          </div>
-          <p style="font-size:13px; color:var(--text-3);">احتفظ بهذا الرقم للمتابعة مع إدارة الكلية.</p>
-        </div>
-      </div>
-    </div>
-
-  </div><!-- /.card -->
-</div><!-- /.form-container -->
+</div><!-- /.page-container -->
 
 <script>
 // ============================================================
 // State
 // ============================================================
-let currentStep = 1;
-let editMode = false;
-let editingAppId = null;
 let lastInquiryApp = null;
-const totalSteps = 5;
-const uploadedDocs = {};
-const radioValues = {};
-
-// ============================================================
-// Open departments — مصدر واحد للحقيقة (Single Source of Truth)
-// ============================================================
-// ⚡ الأقسام المفتوحة للتقديم حاليًا. غيّر هنا بس، وهيتحدّث تلقائيًا:
-// 1) قايمة اختيار القسم في الفورم
-// 2) تنويه "الأقسام المفتوحة" أعلى الصفحة
-// كده مفيش احتمال إن القايمة والتنويه يختلفوا عن بعض بالغلط.
-const OPEN_DEPARTMENTS = [
-  'قسم البصريات',
-  'قسم صحة المجتمع',
-  'قسم الإدارة',
-  'قسم التنفس الصناعي',
-  'قسم تركيبات الأسنان',
-  'قسم الأجهزة الطبية',
-  'قسم المختبرات',
-  'قسم الأشعة'
-];
-
-function renderOpenDepartments() {
-  // 1) قايمة الاختيار
-  const sel = document.getElementById('department');
-  if (sel) {
-    OPEN_DEPARTMENTS.forEach(dep => {
-      const opt = document.createElement('option');
-      opt.textContent = dep;
-      sel.appendChild(opt);
-    });
-  }
-  // 2) شرائح التنويه
-  const chipsWrap = document.getElementById('depts-open-chips');
-  if (chipsWrap) {
-    chipsWrap.innerHTML = OPEN_DEPARTMENTS
-      .map(dep => `<span class="depts-open-chip">${dep.replace(/^قسم\s/, '')}</span>`)
-      .join('');
-  }
-}
-
 
 // ============================================================
 // Beautiful Dialog System
@@ -1940,13 +1216,26 @@ function toggleInquiry() {
   }
 }
 
+// تنسيق النسبة المئوية: بعض الأحيان تُرجع الشيت القيمة ككسر عشري
+// (مثال: 0.8935 بدلاً من 89.35) بسبب تنسيق الخلية كنسبة مئوية في جوجل شيتس.
+// هذه الدالة تُرجع رقم النسبة الصحيح (بدون علامة %) بغض النظر عن شكل القيمة القادمة.
+function normalizePercentage(val) {
+  if (val === undefined || val === null || val === '') return '';
+  let num = parseFloat(String(val).replace('%', '').trim());
+  if (isNaN(num)) return String(val).replace('%', '').trim();
+  if (Math.abs(num) <= 1) num = num * 100;
+  num = Math.round(num * 100) / 100;
+  return String(num);
+}
+
 // ============================================================
 // ⚡ Cache للاستعلامات (sessionStorage) — لتقليل استهلاك القراءة
 // ============================================================
-// نفس فكرة صفحة الاستعلام، بس TTL أقصر (دقيقتين) لأن الصفحة دي فيها
-// كتابة فعلية (تقديم/تعديل طلبات)، فمحتاجين الداتا تفضل حديثة نسبياً.
+// أي استعلام بنفس القيمة (رقم قومي/اسم) بيتخزن محلياً لمدة CACHE_TTL،
+// فلو الطالب دوّس على زرار الاستعلام أكتر من مرة، أو رجع لنفس الصفحة تاني
+// في نفس الجلسة، أو استخدم زرار "رجوع" في المتصفح، مفيش طلب جديد لـ Firebase.
 const IQ_CACHE_PREFIX = 'iq_cache_';
-const IQ_CACHE_TTL_MS = 2 * 60 * 1000;
+const IQ_CACHE_TTL_MS = 5 * 60 * 1000; // 5 دقايق — كفاية لمنع التكرار، وقليلة كفاية عشان لو الإدارة غيّرت حالة الطلب الطالب يشوفها بسرعة معقولة
 
 function getCachedInquiry(key) {
   try {
@@ -1964,158 +1253,7 @@ function getCachedInquiry(key) {
 function setCachedInquiry(key, value) {
   try {
     sessionStorage.setItem(IQ_CACHE_PREFIX + key, JSON.stringify({ t: Date.now(), v: value }));
-  } catch { /* تجاهل بهدوء */ }
-}
-
-// بتتنادى بعد submit/update ناجح عشان أي تحقق تكرار أو استعلام لاحق
-// بنفس الرقم القومي في نفس الجلسة ميرجعش نتيجة قديمة (قبل التعديل/التقديم)
-function clearCachedInquiry(key) {
-  try { sessionStorage.removeItem(IQ_CACHE_PREFIX + key); } catch { /* تجاهل بهدوء */ }
-}
-
-// ============================================================
-// Edit submitted application
-// ============================================================
-// يتحقق إن كان يوجد طلب مُرسَل بالفعل بنفس الرقم القومي
-async function findApplicationByNationalId(nid) {
-  let json = getCachedInquiry(nid);
-  if (!json) {
-    json = await window.FirebaseAPI.getApplications({ search: nid });
-    setCachedInquiry(nid, json);
-  }
-  if (json.success && json.data && json.data.length > 0) {
-    return json.data.find(a => String(a['الرقم القومي']).trim() === nid) || null;
-  }
-  return null;
-}
-
-// يظهر عندما يحاول المستخدم تقديم طلب جديد وهو لديه طلب مُرسَل بالفعل
-function showDuplicateApplicationDialog(app) {
-  const status = app['الحالة'] || 'قيد المراجعة';
-  const editableStatuses = ['قيد المراجعة', 'بانتظار المستندات', 'مرفوض'];
-  const canEdit = editableStatuses.includes(status);
-
-  showDialog({
-    type: 'warning',
-    title: 'لديك طلب مُرسَل بالفعل',
-    subtitle: `رقم الطلب: ${app['ID'] || '—'} — الحالة: ${status}`,
-    message: canEdit
-      ? 'لا يمكن تقديم أكثر من طلب واحد بنفس الرقم القومي. يمكنك تعديل بيانات طلبك الحالي بدلاً من ذلك.'
-      : 'لا يمكن تقديم أكثر من طلب واحد بنفس الرقم القومي، وقد تم قبول طلبك بالفعل. لأي استفسار، تواصل مع إدارة الكلية.',
-    buttons: canEdit
-      ? [
-          { label: 'إغلاق', cls: 'dialog-btn-secondary', action: 'closeDialog()' },
-          { label: 'تعديل طلبي', cls: 'dialog-btn-primary', action: 'closeDialog(); goEditFromDuplicate();' }
-        ]
-      : [
-          { label: 'حسناً', cls: 'dialog-btn-primary', action: 'closeDialog()' }
-        ]
-  });
-
-  lastInquiryApp = app;
-}
-
-function goEditFromDuplicate() {
-  startEditApplication();
-}
-
-function driveThumbFromUrl(url) {
-  const m = String(url || '').match(/\/d\/([^/]+)/);
-  return m ? `https://drive.google.com/thumbnail?id=${m[1]}&sz=w400` : url;
-}
-
-function startEditApplication() {
-  const app = lastInquiryApp;
-  if (!app) return;
-
-  editMode = true;
-  editingAppId = app['ID'];
-
-  // البيانات الشخصية
-  document.getElementById('fullName').value = app['الاسم الرباعي'] || '';
-  const nidEl = document.getElementById('nationalId');
-  nidEl.value = app['الرقم القومي'] || '';
-  nidEl.readOnly = true;
-  document.getElementById('governorate').value = app['المحافظة'] || '';
-  const deptEl = document.getElementById('department');
-  // ⚡ لو القسم اللي الطالب مقدّم فيه اتقفل بعد كده (مش موجود في OPEN_DEPARTMENTS)،
-  // القايمة مش هتلاقي الخيار ده أصلاً — فبنضيفه يدويًا عشان خانة القسم متفضلش فاضية
-  // وتظهر رسالة خطأ غلط للطالب وهو بيعدّل بيانات صحيحة أصلاً.
-  if (app['القسم'] && deptEl && ![...deptEl.options].some(o => o.value === app['القسم'])) {
-    const opt = document.createElement('option');
-    opt.textContent = app['القسم'];
-    deptEl.appendChild(opt);
-  }
-  deptEl.value = app['القسم'] || '';
-
-  const gender = app['النوع'] || '';
-  if (gender) {
-    const genderRadio = document.querySelector(`.radio-opt[onclick*="selectRadio('gender','${gender}'"]`);
-    if (genderRadio) genderRadio.click();
-  }
-
-  // البيانات الأكاديمية
-  document.getElementById('graduationYear').value = app['سنة التخرج'] || '';
-  document.getElementById('grade').value = app['التقدير'] || '';
-  const pctEl = document.getElementById('percentage');
-  pctEl.value = normalizePercentage(app['النسبة المئوية']);
-  pctEl.dispatchEvent(new Event('input'));
-  document.getElementById('total').value = app['المجموع'] || '';
-  if (gender === 'ذكر') {
-    document.getElementById('militaryStatus').value = app['الموقف من التجنيد'] || '';
-  }
-
-  // بيانات التواصل
-  document.getElementById('phone').value = app['رقم التليفون'] || '';
-  document.getElementById('whatsapp').value = app['رقم الواتساب'] || '';
-  document.getElementById('email').value = app['البريد الإلكتروني'] || '';
-
-  // المستندات المرفوعة مسبقًا
-  const docMap = {
-    cert_grad:    'شهادة التخرج',
-    military_doc: 'موقف من التجنيد'
-  };
-  Object.keys(docMap).forEach(key => {
-    const url = app[docMap[key]];
-    if (!url) return;
-    uploadedDocs[key] = url;
-    const preview = document.getElementById(`preview-${key}`);
-    const imgEl    = document.getElementById(`img-${key}`);
-    const nameEl   = document.getElementById(`name-${key}`);
-    const area     = document.getElementById(`upload-${key}`);
-    if (imgEl) imgEl.src = driveThumbFromUrl(url);
-    if (nameEl) nameEl.textContent = 'مستند مرفوع مسبقًا (اضغط لاستبداله)';
-    if (preview) preview.style.display = 'flex';
-    if (area) {
-      area.style.border = '2px solid var(--accent)';
-      area.style.background = 'var(--accent-light)';
-      const errEl = document.getElementById(`err-${key}`);
-      if (errEl) errEl.classList.remove('visible');
-    }
-  });
-
-  // تفعيل واجهة وضع التعديل
-  document.getElementById('edit-mode-banner').style.display = 'flex';
-  document.getElementById('edit-mode-app-id').textContent = editingAppId;
-  document.getElementById('submit-text').textContent = 'حفظ التعديلات 💾';
-
-  // إغلاق لوحة الاستعلام والانتقال لبداية النموذج
-  document.getElementById('inquiry-panel').classList.remove('open');
-  document.getElementById('inquiry-toggle-btn').classList.remove('open');
-  goToStep(1);
-  document.querySelector('.form-container').scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-function cancelEdit() {
-  showDialog({
-    type: 'warning',
-    title: 'إلغاء التعديل',
-    message: 'هل تريد إلغاء التعديل والعودة لصفحة تقديم طلب جديد؟ سيتم فقد أي تغييرات لم تُحفظ.',
-    buttons: [
-      { label: 'تراجع', cls: 'dialog-btn-secondary', action: 'closeDialog()' },
-      { label: 'نعم، إلغاء', cls: 'dialog-btn-primary', action: 'closeDialog(); location.reload();' }
-    ]
-  });
+  } catch { /* sessionStorage ممتلئ أو مش متاح — تجاهل بهدوء */ }
 }
 
 async function checkStatus() {
@@ -2147,10 +1285,11 @@ async function checkStatus() {
   btn.disabled = true;
 
   try {
-    let json = getCachedInquiry(query);
+    const cacheKey = query;
+    let json = getCachedInquiry(cacheKey);
     if (!json) {
       json = await window.FirebaseAPI.getApplications({ search: query });
-      setCachedInquiry(query, json);
+      setCachedInquiry(cacheKey, json);
     }
 
     if (json.success && json.data && json.data.length > 0) {
@@ -2202,19 +1341,6 @@ function selectInquiryResult(index) {
   document.getElementById('iq-multi-results').classList.remove('visible');
   const app = (window.__iqMultiResults || [])[index];
   if (app) renderInquiryResult(app);
-}
-
-// تنسيق النسبة المئوية: بعض الأحيان تُرجع الشيت القيمة ككسر عشري
-// (مثال: 0.8935 بدلاً من 89.35) بسبب تنسيق الخلية كنسبة مئوية في جوجل شيتس.
-// هذه الدالة تُرجع رقم النسبة الصحيح (بدون علامة %) بغض النظر عن شكل القيمة القادمة.
-function normalizePercentage(val) {
-  if (val === undefined || val === null || val === '') return '';
-  let num = parseFloat(String(val).replace('%', '').trim());
-  if (isNaN(num)) return String(val).replace('%', '').trim();
-  if (Math.abs(num) <= 1) num = num * 100;
-  // تقريب لأقرب رقمين عشريين مع إزالة الأصفار الزائدة
-  num = Math.round(num * 100) / 100;
-  return String(num);
 }
 
 function renderInquiryResult(app) {
@@ -2275,19 +1401,10 @@ function renderInquiryResult(app) {
       <strong>📝 ملاحظات الإدارة:</strong><br>${app['ملاحظات الإدارة']}
     </div>`;
   }
-  // زر تعديل الطلب — يظهر فقط إذا كانت الحالة تسمح بالتعديل
-  const editableStatuses = ['قيد المراجعة', 'بانتظار المستندات', 'مرفوض'];
-  if (editableStatuses.includes(status)) {
-    notesHTML += `
-      <button class="btn btn-outline" style="width:100%; justify-content:center; margin-top:10px;" onclick="startEditApplication()">
-        ✏️ تعديل بيانات الطلب
-      </button>`;
-  } else if (status === 'مقبول') {
-    notesHTML += `
-      <div style="font-size:12px; color:var(--text-3); text-align:center; margin-top:10px; font-weight:600;">
-        تم قبول طلبك ولا يمكن تعديله. لأي استفسار، تواصل مع إدارة الكلية.
-      </div>`;
-  }
+  notesHTML += `
+    <div class="iq-closed-note">
+      باب التقديم مغلق حالياً ولا يمكن تعديل الطلبات. لأي استفسار، يرجى التواصل مع إدارة الكلية.
+    </div>`;
 
   notesWrap.innerHTML = notesHTML;
 
@@ -2406,515 +1523,16 @@ function printApplicationSummary() {
 
   <div class="p-footer">
     <span>تم الطباعة بتاريخ: ${printedAt}</span>
-    <span>هذه الورقة للاستخدام الشخصي ولا تُعد إثباتاً رسمياً للقبول</span>
+    <span>كلية تكنولوجيا العلوم الصحية التطبيقية — جامعة بني سويف</span>
   </div>
-
-  <script>
-    window.onload = function () { window.print(); };
-  <\/script>
 </body>
 </html>`;
 
-  const win = window.open('', '_blank');
-  if (!win) {
-    showDialog({
-      type: 'warning',
-      title: 'تعذّر فتح نافذة الطباعة',
-      message: 'يبدو أن المتصفح يمنع النوافذ المنبثقة. يرجى السماح بالنوافذ المنبثقة لهذا الموقع ثم المحاولة مرة أخرى.'
-    });
-    return;
-  }
-  win.document.open();
-  win.document.write(html);
-  win.document.close();
+  const w = window.open('', '_blank');
+  w.document.write(html);
+  w.document.close();
+  setTimeout(() => w.print(), 400);
 }
-
-
-// ============================================================
-// Init
-// ============================================================
-document.addEventListener('DOMContentLoaded', () => {
-  renderOpenDepartments();
-
-  // Fill graduation years (last 15 years, exclude more than 10 for hint only)
-  const yearSel = document.getElementById('graduationYear');
-  const now = new Date().getFullYear();
-  for (let y = now; y >= now - 15; y--) {
-    yearSel.innerHTML += `<option value="${y}">${y}</option>`;
-  }
-
-  // Percentage live bar
-  document.getElementById('percentage').addEventListener('input', e => {
-    const v = parseFloat(e.target.value) || 0;
-    const bar = document.getElementById('pct-bar');
-    bar.style.width = Math.min(v, 100) + '%';
-    bar.style.background = v >= 85 ? '#0ea89e' : v >= 70 ? '#c8972b' : '#c0392b';
-  });
-});
-
-// ============================================================
-// Radio selection
-// ============================================================
-function selectRadio(name, value, el) {
-  radioValues[name] = value;
-  document.querySelectorAll(`[onclick*="selectRadio('${name}"]`).forEach(e => e.classList.remove('selected'));
-  el.classList.add('selected');
-
-  // Show/hide military
-  if (name === 'gender') {
-    const ms = document.getElementById('military-section');
-    ms.style.display = value === 'ذكر' ? '' : 'none';
-  }
-}
-
-// ============================================================
-// Upload to Google Drive (via Apps Script backend)
-// ============================================================
-async function handleUpload(input, docKey) {
-  const file = input.files[0];
-  if (!file) return;
-
-  const area = document.getElementById(`upload-${docKey}`);
-  const preview = document.getElementById(`preview-${docKey}`);
-  const imgEl = document.getElementById(`img-${docKey}`);
-  const nameEl = document.getElementById(`name-${docKey}`);
-
-  // تحقق من حجم الملف قبل الرفع (5MB)
-  if (file.size > 5 * 1024 * 1024) {
-    showDialog({
-      type: 'error',
-      title: 'حجم الملف كبير جدًا',
-      message: 'الحد الأقصى لحجم الملف هو 5MB. يرجى اختيار ملف أصغر.'
-    });
-    input.value = '';
-    return;
-  }
-
-  // Show uploading state
-  area.classList.add('uploading');
-
-  try {
-    // Convert to base64
-    const base64 = await fileToBase64(file);
-    const b64data = base64.split(',')[1];
-
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      body: JSON.stringify({
-        action: 'uploadFile',
-        base64: b64data,
-        fileName: `${docKey}_${Date.now()}_${file.name}`,
-        mimeType: file.type || 'image/jpeg'
-      })
-    });
-    const json = await res.json();
-
-    if (json.success) {
-      uploadedDocs[docKey] = json.url;
-
-      imgEl.src = json.thumbnailUrl;
-      nameEl.textContent = file.name;
-      preview.style.display = 'flex';
-      area.style.border = '2px solid var(--accent)';
-      area.style.background = 'var(--accent-light)';
-
-      // Clear error
-      const errEl = document.getElementById(`err-${docKey}`);
-      if (errEl) { errEl.classList.remove('visible'); }
-    } else {
-      showDialog({
-        type: 'error',
-        title: 'فشل رفع الملف',
-        message: json.message || 'تعذّر رفع الملف إلى جوجل درايف. يرجى إعادة المحاولة.'
-      });
-    }
-  } catch (err) {
-    showDialog({
-      type: 'error',
-      title: 'خطأ أثناء رفع الملف',
-      message: `حدث خطأ غير متوقع أثناء رفع الملف.<br><span style="font-size:12px;color:var(--text-3);">${err.message}</span>`
-    });
-  } finally {
-    area.classList.remove('uploading');
-  }
-}
-
-function fileToBase64(file) {
-  return new Promise((res, rej) => {
-    const r = new FileReader();
-    r.onload = () => res(r.result);
-    r.onerror = rej;
-    r.readAsDataURL(file);
-  });
-}
-
-// ============================================================
-// Validation
-// ============================================================
-const validators = {
-  1: () => {
-    let ok = true;
-    const name = document.getElementById('fullName').value.trim();
-    const nameWords = name.split(/\s+/).filter(Boolean);
-    if (nameWords.length < 4 || !/^[\u0600-\u06FF\s]+$/.test(name)) {
-      showError('fullName', true); ok = false;
-    } else hideError('fullName');
-
-    const nid = document.getElementById('nationalId').value.trim();
-    if (!/^\d{14}$/.test(nid)) { showError('nationalId', true); ok = false; }
-    else hideError('nationalId');
-
-    if (!radioValues.gender) { showError('gender', true); ok = false; }
-    else hideError('gender');
-
-    if (!document.getElementById('governorate').value) { showError('governorate', true); ok = false; }
-    else hideError('governorate');
-
-    if (!document.getElementById('department').value) { showError('department', true); ok = false; }
-    else hideError('department');
-
-    return ok;
-  },
-  2: () => {
-    let ok = true;
-    if (!document.getElementById('graduationYear').value) { showError('graduationYear', true); ok = false; }
-    else hideError('graduationYear');
-
-    if (!document.getElementById('grade').value) { showError('grade', true); ok = false; }
-    else hideError('grade');
-
-    const pct = parseFloat(document.getElementById('percentage').value);
-    if (!pct || pct < 50 || pct > 100) { showError('percentage', true); ok = false; }
-    else hideError('percentage');
-
-    if (radioValues.gender === 'ذكر' && !document.getElementById('militaryStatus').value) {
-      showError('militaryStatus', true); ok = false;
-    } else hideError('militaryStatus');
-
-    return ok;
-  },
-  3: () => {
-    let ok = true;
-    const phone = document.getElementById('phone').value.trim();
-    if (!/^01[0-2,5]\d{8}$/.test(phone)) { showError('phone', true); ok = false; }
-    else hideError('phone');
-
-    const wa = document.getElementById('whatsapp').value.trim();
-    if (!/^01[0-2,5]\d{8}$/.test(wa)) { showError('whatsapp', true); ok = false; }
-    else hideError('whatsapp');
-
-    const email = document.getElementById('email').value.trim();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showError('email', true); ok = false; }
-    else hideError('email');
-
-    return ok;
-  },
-  4: () => {
-    let ok = true;
-
-    if (!uploadedDocs['cert_grad']) { showError('cert_grad', true); ok = false; }
-    else showError('cert_grad', false);
-
-    // باقي المستندات تبقى اختيارية
-    return ok;
-  }
-};
-
-function showError(id, show) {
-  const el = document.getElementById('err-' + id);
-  const inp = document.getElementById(id);
-  const uploadArea = document.getElementById('upload-' + id);
-  if (el) el.classList.toggle('visible', show);
-  if (inp) inp.classList.toggle('error', show);
-  if (uploadArea) uploadArea.classList.toggle('error', show);
-}
-
-function hideError(id) { showError(id, false); }
-
-// ============================================================
-// Step Navigation
-// ============================================================
-async function nextStep(from) {
-  if (from === 1 && validators[1]()) {
-    // إذا كان المستخدم يقوم بتعديل طلب مُرسَل مسبقًا، لا داعي لإعادة الفحص
-    if (editMode) { goToStep(2); return; }
-
-    const nid = document.getElementById('nationalId').value.trim();
-    const btn = document.getElementById('next-step1-btn');
-    document.getElementById('next-step1-text').style.display = 'none';
-    document.getElementById('next-step1-spinner').style.display = '';
-    btn.disabled = true;
-
-    try {
-      const existing = await findApplicationByNationalId(nid);
-      if (existing) {
-        showDuplicateApplicationDialog(existing);
-      } else {
-        goToStep(2);
-      }
-    } catch (err) {
-      // تعذّر التحقق (مشكلة اتصال) — نسمح بالمتابعة حتى لا يتعطّل المستخدم بالكامل
-      goToStep(2);
-    } finally {
-      document.getElementById('next-step1-text').style.display = '';
-      document.getElementById('next-step1-spinner').style.display = 'none';
-      btn.disabled = false;
-    }
-  } else if (from === 2 && validators[2]()) {
-    // إذا كان المستخدم يقوم بتعديل طلب مُرسَل مسبقًا، لا داعي لإعادة فحص الأهلية
-    // (السن/سنوات التخرج بتتحسب على تاريخ اليوم، وهتفشل بالغلط لمجرد مرور الوقت)
-    if (editMode) { goToStep(3); return; }
-    checkEligibility().then(eligible => {
-      if (eligible) goToStep(3);
-    });
-  } else if (from === 3 && validators[3]()) {
-    goToStep(4);
-  } else if (from === 4 && validators[4]()) {
-    buildReview();
-    goToStep(5);
-  }
-}
-
-function prevStep(from) { goToStep(from - 1); }
-
-function goToStep(n) {
-  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-  if (n === 'success') {
-    document.getElementById('section-success').classList.add('active');
-  } else {
-    document.querySelector(`#section-${n}`)?.classList.add('active');
-    currentStep = n;
-    updateProgress();
-  }
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-function updateProgress() {
-  for (let i = 1; i <= 5; i++) {
-    const dot = document.getElementById(`step-dot-${i}`);
-    dot.classList.remove('active', 'done');
-    if (i < currentStep) dot.classList.add('done');
-    else if (i === currentStep) dot.classList.add('active');
-  }
-  for (let i = 1; i <= 4; i++) {
-    const line = document.getElementById(`line-${i}-${i+1}`);
-    if (line) line.classList.toggle('done', i < currentStep);
-  }
-}
-
-// ============================================================
-// Eligibility check (client-side)
-// ============================================================
-async function checkEligibility() {
-  const reasons = [];
-  const nid = document.getElementById('nationalId').value;
-  const gradYear = parseInt(document.getElementById('graduationYear').value);
-  const grade = document.getElementById('grade').value;
-  const now = new Date();
-
-  // Age from NID
-  if (nid.length === 14) {
-    const century = nid[0] === '2' ? 1900 : 2000;
-    const by = century + parseInt(nid.substring(1, 3));
-    const bm = parseInt(nid.substring(3, 5));
-    const bd = parseInt(nid.substring(5, 7));
-    let age = now.getFullYear() - by;
-    if (now.getMonth() + 1 < bm || (now.getMonth() + 1 === bm && now.getDate() < bd)) age--;
-
-    if (age > 30) {
-      reasons.push(`❌ <strong>تجاوز حد السن:</strong> عمرك <strong>${age} سنة</strong> والحد الأقصى المسموح به <strong>30 سنة</strong>.`);
-    }
-  }
-
-  // Years since grad
-  if (gradYear) {
-    const since = now.getFullYear() - gradYear;
-    if (since > 10) {
-      reasons.push(`❌ <strong>تجاوز الحد الزمني للتخرج:</strong> مر على تخرجك <strong>${since} سنوات</strong> والحد الأقصى <strong>10 سنوات</strong>.`);
-    }
-  }
-
-  // Grade
-  if (grade && !['جيد جداً','ممتاز','امتياز مع مرتبة الشرف'].includes(grade)) {
-    reasons.push(`❌ <strong>التقدير غير مؤهل:</strong> تقديرك <strong>"${grade}"</strong> والحد الأدنى المطلوب هو <strong>"جيد جداً"</strong> على الأقل.`);
-  }
-
-  if (reasons.length > 0) {
-    showRejection(reasons);
-    return false;
-  }
-
-  hideRejection();
-  return true;
-}
-
-function showRejection(reasons) {
-  // Also update the inline block
-  document.getElementById('rejection-wrap').style.display = '';
-  const alertEl = document.getElementById('rejection-alert');
-  alertEl.style.display = '';
-  const rrEl = document.getElementById('rejection-reasons');
-  rrEl.innerHTML = reasons.map(r => `<div class="rejection-reason">${r}</div>`).join('');
-
-  // Show beautiful dialog
-  const cleanReasons = reasons.map(r => r.replace(/<strong>/g,'').replace(/<\/strong>/g,''));
-  showDialog({
-    type: 'error',
-    title: 'عذراً — لا يمكن استكمال التقديم',
-    subtitle: 'لا تستوفي متطلبات القبول المحددة',
-    message: 'تم رفض طلبك تلقائياً للأسباب التالية. إذا كنت تعتقد أن هناك خطأً، يُرجى التواصل مع إدارة الكلية.',
-    items: cleanReasons,
-    buttons: [
-      { label: 'مراجعة البيانات', cls: 'dialog-btn-secondary', action: 'closeDialog(); goToStep(2);' },
-      { label: 'التواصل مع الإدارة', cls: 'dialog-btn-primary', action: 'closeDialog()' }
-    ]
-  });
-}
-
-function hideRejection() {
-  document.getElementById('rejection-wrap').style.display = 'none';
-}
-
-// ============================================================
-// Build Review
-// ============================================================
-function buildReview() {
-  const docLabels = {
-    cert_grad:    'شهادة التخرج',
-    military_doc: 'موقف من التجنيد'
-  };
-
-  const sections = [
-    {
-      title: '👤 البيانات الشخصية',
-      rows: [
-        ['الاسم الرباعي', document.getElementById('fullName').value],
-        ['الرقم القومي', document.getElementById('nationalId').value],
-        ['النوع', radioValues.gender || '—'],
-        ['المحافظة', document.getElementById('governorate').value],
-        ['القسم', document.getElementById('department').value],
-      ]
-    },
-    {
-      title: '🎓 البيانات الأكاديمية',
-      rows: [
-        ['سنة التخرج', document.getElementById('graduationYear').value],
-        ['التقدير', document.getElementById('grade').value],
-        ['النسبة المئوية', document.getElementById('percentage').value + '%'],
-        ['المجموع', document.getElementById('total').value || '—'],
-        ...(radioValues.gender === 'ذكر' ? [['الموقف من التجنيد', document.getElementById('militaryStatus').value]] : [])
-      ]
-    },
-    {
-      title: '📱 بيانات التواصل',
-      rows: [
-        ['رقم التليفون', document.getElementById('phone').value],
-        ['رقم الواتساب', document.getElementById('whatsapp').value],
-        ['البريد الإلكتروني', document.getElementById('email').value],
-      ]
-    }
-  ];
-
-  let html = sections.map(sec => `
-    <div style="background:var(--surface-2); border-radius:var(--radius); padding:20px; border:1px solid var(--border);">
-      <div style="font-size:15px; font-weight:800; color:var(--primary); margin-bottom:14px;">${sec.title}</div>
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-        ${sec.rows.map(([k, v]) => `
-          <div style="display:flex; flex-direction:column; gap:3px;">
-            <span style="font-size:11px; font-weight:700; color:var(--text-3);">${k}</span>
-            <span style="font-size:14px; font-weight:600; color:var(--text-1);">${v || '—'}</span>
-          </div>
-        `).join('')}
-      </div>
-    </div>
-  `).join('');
-
-  // Documents
-  html += `<div style="background:var(--surface-2); border-radius:var(--radius); padding:20px; border:1px solid var(--border);">
-    <div style="font-size:15px; font-weight:800; color:var(--primary); margin-bottom:14px;">📎 المستندات المرفوعة</div>
-    <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:12px;">
-      ${Object.entries(uploadedDocs).map(([k, url]) => `
-        <div style="text-align:center; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:10px; overflow:hidden;">
-          <img src="${url}" style="width:100%; height:70px; object-fit:cover; border-radius:6px; margin-bottom:6px;" onerror="this.src='data:image/svg+xml,<svg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 48 48\\'><text y=\\'32\\' font-size=\\'32\\'>📄</text></svg>'">
-          <div style="font-size:11px; font-weight:700; color:var(--text-2);">${docLabels[k] || k}</div>
-        </div>
-      `).join('')}
-    </div>
-  </div>`;
-
-  document.getElementById('review-content').innerHTML = html;
-}
-
-// ============================================================
-// Submit
-// ============================================================
-async function submitForm() {
-  const btn = document.getElementById('submit-btn');
-  document.getElementById('submit-text').style.display = 'none';
-  document.getElementById('submit-spinner').style.display = '';
-  btn.disabled = true;
-
-  const payload = {
-    ...(editMode ? { id: editingAppId } : {}),
-    fullName: document.getElementById('fullName').value.trim(),
-    nationalId: document.getElementById('nationalId').value.trim(),
-    gender: radioValues.gender,
-    governorate: document.getElementById('governorate').value,
-    department: document.getElementById('department').value,
-    graduationYear: document.getElementById('graduationYear').value,
-    grade: document.getElementById('grade').value,
-    percentage: document.getElementById('percentage').value,
-    total: document.getElementById('total').value,
-    phone: document.getElementById('phone').value.trim(),
-    whatsapp: document.getElementById('whatsapp').value.trim(),
-    email: document.getElementById('email').value.trim(),
-    militaryStatus: radioValues.gender === 'ذكر' ? document.getElementById('militaryStatus').value : null,
-    docs: uploadedDocs
-  };
-
-  try {
-    const json = editMode
-      ? await window.FirebaseAPI.updateApplication(payload)
-      : await window.FirebaseAPI.submitApplication(payload);
-
-    if (json.success) {
-      clearCachedInquiry(payload.nationalId); // ⚡ يمنع رجوع نتيجة قديمة من الكاش بعد التقديم/التعديل
-      document.getElementById('success-app-id').textContent = json.applicationId;
-      if (editMode) {
-        document.getElementById('success-circle').textContent = '✅';
-        document.getElementById('success-title').textContent = 'تم تحديث طلبك بنجاح!';
-        document.getElementById('success-desc').textContent = 'تم حفظ التعديلات، وأصبح طلبك «قيد المراجعة» مرة أخرى. سيتم إبلاغك بالنتيجة.';
-      }
-      goToStep('success');
-      document.querySelector('.steps-track').style.display = 'none';
-      document.getElementById('edit-mode-banner').style.display = 'none';
-    } else if (json.rejected) {
-      showRejection(json.reasons);
-      goToStep(2);
-    } else if (json.duplicate) {
-      showDuplicateApplicationDialog(json.existingApplication);
-      goToStep(1);
-    } else {
-      showDialog({
-        type: 'error',
-        title: 'خطأ في إرسال الطلب',
-        message: `حدث خطأ أثناء إرسال طلبك. يرجى المحاولة مرة أخرى أو التواصل مع إدارة الكلية.<br>
-          <span style="font-size:12px;color:var(--text-3);">التفاصيل: ${json.message || 'خطأ غير محدد'}</span>`
-      });
-    }
-  } catch (err) {
-    showDialog({
-      type: 'error',
-      title: 'تعذّر الاتصال بالخادم',
-      message: 'يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى. إذا استمرت المشكلة، تواصل مع إدارة الكلية.'
-    });
-  } finally {
-    document.getElementById('submit-text').style.display = '';
-    document.getElementById('submit-spinner').style.display = 'none';
-    btn.disabled = false;
-  }
-}
-
 </script>
 </body>
 </html>
